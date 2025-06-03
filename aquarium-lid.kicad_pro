@@ -37,9 +37,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.8,
-          "height": 1.27,
-          "width": 2.54
+          "drill": 3.499993,
+          "height": 1.3,
+          "width": 4.0
         },
         "silk_line_width": 0.1,
         "silk_text_italic": false,
@@ -91,6 +91,10 @@
         ],
         [
           "solder_mask_bridge|32085000|26955000|fae000d3-40ff-45e8-8e6e-d04c59b4401b|32a19980-69c8-4f25-935b-6fe23e46d30c",
+          ""
+        ],
+        [
+          "starved_thermal|70460000|47735000|825963f7-9606-4951-96aa-c191c3080a7e|3edd3c6c-5902-4a31-b9b4-3f47f8a2cf60|B.Cu",
           ""
         ]
       ],
@@ -550,7 +554,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "/home/mawoka/Downloads/aquarium-lid-pcb-gerber/",
+      "plot": "/home/mawoka/projects/aquarium-lid/stencil/",
       "pos_files": "/home/mawoka/projects/aquarium-lid/",
       "specctra_dsn": "",
       "step": "",
@@ -749,8 +753,8 @@
       "group_symbols": true,
       "include_excluded_from_bom": true,
       "name": "",
-      "sort_asc": true,
-      "sort_field": "Reference"
+      "sort_asc": false,
+      "sort_field": "MP"
     },
     "connection_grid_size": 50.0,
     "drawing": {
