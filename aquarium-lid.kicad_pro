@@ -78,23 +78,11 @@
           ""
         ],
         [
-          "silk_edge_clearance|66385000|20100000|27768b6b-be12-4be2-8ce3-ac524b26ac67|96bf0d5e-93e2-4d70-8d00-8f58b73b99e5",
-          ""
-        ],
-        [
-          "silk_edge_clearance|75391650|20015362|e7613d41-6ca3-44ac-a31e-a891b9ce8633|8539356f-acb7-403b-bdd0-551a3af97cfd",
-          ""
-        ],
-        [
           "solder_mask_bridge|27285000|26955000|a07a318f-9261-49f9-98a9-78f2fdb30cdb|96755c33-7980-40c9-8371-4b0f0422a161",
           ""
         ],
         [
           "solder_mask_bridge|32085000|26955000|fae000d3-40ff-45e8-8e6e-d04c59b4401b|32a19980-69c8-4f25-935b-6fe23e46d30c",
-          ""
-        ],
-        [
-          "starved_thermal|70460000|47735000|825963f7-9606-4951-96aa-c191c3080a7e|3edd3c6c-5902-4a31-b9b4-3f47f8a2cf60|B.Cu",
           ""
         ]
       ],
@@ -127,7 +115,7 @@
         "items_not_allowed": "error",
         "length_out_of_range": "error",
         "lib_footprint_issues": "warning",
-        "lib_footprint_mismatch": "warning",
+        "lib_footprint_mismatch": "ignore",
         "malformed_courtyard": "error",
         "microvia_drill_out_of_range": "error",
         "mirrored_text_on_front_layer": "warning",
@@ -139,7 +127,7 @@
         "padstack": "warning",
         "pth_inside_courtyard": "ignore",
         "shorting_items": "error",
-        "silk_edge_clearance": "warning",
+        "silk_edge_clearance": "ignore",
         "silk_over_copper": "warning",
         "silk_overlap": "warning",
         "skew_out_of_range": "error",
@@ -554,7 +542,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "/home/mawoka/projects/aquarium-lid/stencil/",
+      "plot": "/home/mawoka/Downloads/aquarium-lid-pcb-gerber/",
       "pos_files": "/home/mawoka/projects/aquarium-lid/",
       "specctra_dsn": "",
       "step": "",

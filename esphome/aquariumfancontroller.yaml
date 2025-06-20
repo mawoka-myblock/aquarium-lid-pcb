@@ -1,0 +1,391 @@
+substitutions:
+  name: aquariumfancontroller
+  friendly_name: Aquarium Fan Controller
+
+esphome:
+  name: "${name}"
+  friendly_name: "${friendly_name}"
+  name_add_mac_suffix: True
+  project: 
+    name: esphome.aquarium-fan-controller
+    version: "0.1"
+
+dashboard_import:
+  package_import_url: github://mawoka-myblock/aquarium-lid-pcb/esphome/aquariumfancontroller.yaml
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+
+ota:
+  - platform: esphome
+api:
+wifi:
+  ap:
+    password: "mawoka.eu"
+
+improv_serial:
+
+captive_portal:
+esp32_improv:
+  authorizer: none
+
+script:
+  - id: play_siren_loop
+    mode: restart
+    then:
+      - while:
+          condition:
+            lambda: return id(alarm_triggered) && !id(alarm_silenced);
+          then:
+            - rtttl.play: "siren:d=8,o=5,b=100:d,e,d,e,d,e,d,e"
+            - delay: 2.8s
+  - id: trigger_alarm
+    parameters:
+      is_high_alarm: bool
+    then:
+      - if:
+          condition:
+            lambda: return !id(alarm_triggered);
+          then:
+            - globals.set:
+                id: alarm_triggered
+                value: "true"
+            - globals.set:
+                id: alarm_silenced
+                value: "false"
+            - globals.set:
+                id: is_hot_alarm
+                value: !lambda return is_high_alarm;
+            - script.execute: play_siren_loop
+            - light.turn_on: 
+                id: leds
+                effect: "Alarm Strobe"
+  - id: disable_alarm
+    then:
+      - if:
+          condition:
+            lambda: return id(alarm_triggered);
+          then:
+            - globals.set:
+                id: alarm_triggered
+                value: "false"
+            - globals.set:
+                id: alarm_silenced
+                value: "false"
+            - rtttl.stop
+            - lambda: |-
+                auto call = id(leds).turn_on();
+                auto name = to_string((int) id(led_standby_brightness).state) + "% Pulse";
+                call.set_effect(name);
+                call.perform();
+
+
+fan:
+  - platform: speed
+    output: fan1_out
+    id: fan1
+    name: Fan 1
+    web_server:
+      sorting_group_id: sg_manual_control
+  - platform: speed
+    output: fan2_out
+    id: fan2
+    name: Fan 2
+    web_server:
+      sorting_group_id: sg_manual_control
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO6
+      mode:
+        pullup: True
+        input: True
+      inverted: True
+    name: Button
+    on_click: 
+      - min_length: 1500ms
+        max_length: 5s
+        then:
+          - if:
+              condition:
+                lambda: return id(alarm_silenced);
+              then:
+                - globals.set:
+                    id: alarm_silenced
+                    value: "false"
+                - if:
+                    condition:
+                      lambda: return id(alarm_triggered);
+                    then:
+                      - script.execute: play_siren_loop
+                      - rtttl.stop
+              else:
+                - globals.set:
+                    id: alarm_silenced
+                    value: "true"
+    web_server:
+      sorting_group_id: sg_status
+  - platform: template
+    name: "Alarm triggered"
+    lambda: return id(alarm_triggered);
+    web_server:
+      sorting_group_id: sg_status
+
+
+      
+
+globals:
+  - id: alarm_triggered
+    type: bool
+    initial_value: "false"
+  - id: alarm_silenced
+    type: bool
+    initial_value: "false"
+  - id: is_hot_alarm
+    type: bool
+    initial_value: "false"
+
+output:
+  - platform: ledc
+    id: fan1_out
+    pin: GPIO9
+  - platform: ledc
+    id: fan2_out
+    pin: GPIO10
+  - platform: ledc
+    id: buzzer
+    pin: GPIO7
+
+rtttl:
+  - output: buzzer
+
+light:
+  - platform: esp32_rmt_led_strip
+    num_leds: 3
+    pin: GPIO4
+    rgb_order: GRB
+    name: LEDs
+    id: leds
+    rmt_channel: 0
+    bit0_high: 300ns
+    bit1_high: 600ns
+    bit0_low: 2000ns
+    bit1_low: 2000ns
+    restore_mode: RESTORE_DEFAULT_ON
+    effects:
+        - addressable_rainbow:
+        - strobe:
+            name: "Alarm Strobe"
+            colors:
+              - state: true
+                brightness: 100%
+                red: 100%
+                green: 0%
+                blue: 0%
+                duration: 1s
+              - state: false
+                duration: 1s
+            
+        - pulse:
+            name: 10% Pulse
+            transition_length: 3s
+            update_interval: 3s
+            max_brightness: 10%
+        - pulse:
+            name: 20% Pulse
+            transition_length: 3s
+            update_interval: 3s
+            max_brightness: 20%
+        - pulse:
+            name: 30% Pulse
+            transition_length: 3s
+            update_interval: 3s
+            max_brightness: 30%
+        - pulse:
+            name: 40% Pulse
+            transition_length: 3s
+            update_interval: 3s
+            max_brightness: 40%
+        - pulse:
+            name: 50% Pulse
+            transition_length: 3s
+            update_interval: 3s
+            max_brightness: 50%
+        - pulse:
+            name: 60% Pulse
+            transition_length: 3s
+            update_interval: 3s
+            max_brightness: 60%
+        - pulse:
+            name: 70% Pulse
+            transition_length: 3s
+            update_interval: 3s
+            max_brightness: 70%
+        - pulse:
+            name: 80% Pulse
+            transition_length: 3s
+            update_interval: 3s
+            max_brightness: 80%
+        - pulse:
+            name: 90% Pulse
+            transition_length: 3s
+            update_interval: 3s
+            max_brightness: 90%
+        - pulse:
+            name: 100% Pulse
+            transition_length: 3s
+            update_interval: 3s
+            max_brightness: 100%
+    web_server:
+      sorting_group_id: sg_manual_control
+
+
+web_server:
+  port: 80
+  version: 3
+  log: false
+  sorting_groups:
+    - id: sg_settings
+      name: Settings
+    - id: sg_status
+      name: Status
+    - id: sg_manual_control
+      name: Manual Control
+  local: true
+
+one_wire:
+  - platform: gpio
+    pin: GPIO8
+sensor:
+  - platform: dallas_temp
+    name: Temperature
+    update_interval: 10s
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: "return id(fan_on_temp).state < x;"
+            then:
+              - fan.turn_on:
+                  id: fan1
+                  speed: 100
+              - fan.turn_on:
+                  id: fan2
+                  speed: 100
+            else:
+              - fan.turn_off: fan1
+              - fan.turn_off: fan2
+        - if:
+            condition:
+              lambda: "return id(alarm_high_temp).state < x;"
+            then:
+              - script.execute:
+                  id: trigger_alarm
+                  is_high_alarm: "true"
+            else:
+              - if:
+                  condition:
+                    lambda: "return id(alarm_low_temp).state > x;"
+                  then:
+                    - script.execute:
+                        id: trigger_alarm
+                        is_high_alarm: "true"
+                  else:
+                    - script.execute: disable_alarm
+    web_server:
+      sorting_group_id: sg_status
+
+number:
+  - platform: template
+    name: Fan On Temperature
+    optimistic: true
+    id: fan_on_temp
+    min_value: 18
+    max_value: 40
+    step: 0.1
+    unit_of_measurement: °C
+    restore_value: True
+    web_server:
+      sorting_group_id: sg_settings
+  - platform: template
+    name: "Alarm High Temp"
+    id: alarm_high_temp
+    optimistic: true
+    min_value: 15
+    max_value: 45
+    step: 0.1
+    unit_of_measurement: "°C"
+    restore_value: True
+    web_server:
+      sorting_group_id: sg_settings
+  - platform: template
+    name: "Alarm Low Temp"
+    id: alarm_low_temp
+    optimistic: true
+    min_value: 0
+    max_value: 30
+    step: 0.1
+    unit_of_measurement: "°C"
+    restore_value: True
+    web_server:
+      sorting_group_id: sg_settings
+  - platform: template
+    name: "LED Standby Brightness"
+    id: led_standby_brightness
+    optimistic: true
+    min_value: 10
+    max_value: 100
+    step: 10
+    restore_value: True
+    web_server:
+      sorting_group_id: sg_settings
+        
+
+select:
+  - platform: template
+    name: LED Standby Mode
+    id: led_standby_mode
+    optimistic: true
+    options:
+      - "Color Breathing"
+      - "Off"
+      - "Constant Color"
+      - Rainbow
+    web_server:
+      sorting_group_id: sg_settings
+
+switch:
+  - platform: template
+    name: "Enable Moisture Blast"
+    id: moisture_blast
+    optimistic: true
+    web_server:
+      sorting_group_id: sg_manual_control
+  - platform: template
+    name: "Silence Alarm"
+    lambda: return id(alarm_silenced);
+    turn_on_action: 
+      then:
+        - globals.set:
+            id: alarm_silenced
+            value: "true"
+    turn_off_action: 
+      then:
+        - globals.set:
+            id: alarm_silenced
+            value: "false"
+        - if:
+            condition:
+              lambda: return id(alarm_triggered);
+            then:
+              - script.execute: play_siren_loop
+              - rtttl.stop
+    web_server:
+      sorting_group_id: sg_manual_control
