@@ -545,7 +545,7 @@
       "plot": "/home/mawoka/Downloads/aquarium-lid-pcb-gerber/",
       "pos_files": "/home/mawoka/projects/aquarium-lid/",
       "specctra_dsn": "",
-      "step": "",
+      "step": "aquarium-lid.step",
       "svg": "",
       "vrml": ""
     },
