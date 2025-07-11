@@ -271,17 +271,24 @@ sensor:
       then:
         - if:
             condition:
-              lambda: "return id(fan_on_temp).state < x;"
+              lambda: "return !id(manual_control).state;"
             then:
-              - fan.turn_on:
-                  id: fan1
-                  speed: 100
-              - fan.turn_on:
-                  id: fan2
-                  speed: 100
-            else:
-              - fan.turn_off: fan1
-              - fan.turn_off: fan2
+              - if:
+                  condition:
+                    lambda: "return id(fan_on_temp).state < x;"
+                  then:
+                    - fan.turn_on:
+                        id: fan1
+                        speed: 100
+                    - fan.turn_on:
+                        id: fan2
+                        speed: 100
+              - if:
+                  condition:
+                    lambda: "return id(fan_on_temp).state - 0.1 > x;"
+                  then:
+                    - fan.turn_off: fan1
+                    - fan.turn_off: fan2
         - if:
             condition:
               lambda: "return id(alarm_high_temp).state < x;"
@@ -368,6 +375,12 @@ switch:
     optimistic: true
     web_server:
       sorting_group_id: sg_manual_control
+  - platform: template
+    name: "Manual Control"
+    id: manual_control
+    optimistic: True
+    web_server:
+      sorting_group_id: sg_manual_control  
   - platform: template
     name: "Silence Alarm"
     lambda: return id(alarm_silenced);
