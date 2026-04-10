@@ -1,108 +1,173 @@
 #![no_std]
 #![no_main]
+#![deny(
+    clippy::mem_forget,
+    reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
+    holding buffers for the duration of a data transfer."
+)]
+#![deny(clippy::large_stack_frames)]
 
+use aht20::AHT20;
+use bt_hci::controller::ExternalController;
+use defmt::info;
 use embassy_executor::Spawner;
+use embassy_sync::blocking_mutex::raw::NoopRawMutex;
+use embassy_sync::mutex::Mutex;
 use embassy_time::{Duration, Timer};
-use esp_hal::clock::CpuClock;
-use esp_hal::gpio::Input;
-use esp_hal::gpio::InputConfig;
-use esp_hal::gpio::Pull;
-use esp_hal::ledc::channel;
+use esp_ds18b20::Ds18b20;
+use esp_hal::gpio::{AnyPin, Output, OutputConfig};
+use esp_hal::i2c::master::{self as I2C};
 use esp_hal::ledc::channel::ChannelIFace;
-use esp_hal::ledc::timer;
-use esp_hal::ledc::timer::TimerIFace;
-use esp_hal::ledc::timer::TimerSpeed;
-use esp_hal::ledc::Ledc;
-use esp_hal::ledc::LowSpeed;
+use esp_hal::ledc::{Ledc, LowSpeed, channel};
 use esp_hal::rmt::Rmt;
 use esp_hal::time::Rate;
-use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::timer::timg::TimerGroup;
-use esp_hal_smartled::{smart_led_buffer, SmartLedsAdapter};
-use esp_println::println;
-use log::info;
-use smart_leds::SmartLedsWrite;
-use smart_leds::RGB;
-
-#[panic_handler]
-fn panic(_: &core::panic::PanicInfo) -> ! {
-    loop {}
-}
+use esp_hal::{
+    clock::CpuClock,
+    ledc::timer::{self, TimerIFace},
+};
+use esp_hal_smartled::{SmartLedsAdapter, buffer_size, smart_led_buffer};
+use esp_onewire::OneWireBus;
+use esp_radio::ble::controller::BleConnector;
+use firmware::storage::nvs::Nvs;
+use smart_leds::{SmartLedsWrite, colors};
+use trouble_host::prelude::*;
+use {esp_backtrace as _, esp_println as _};
 
 extern crate alloc;
 
-#[esp_hal_embassy::main]
-async fn main(spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
-    // generator version: 0.3.1
+const CONNECTIONS_MAX: usize = 1;
+const L2CAP_CHANNELS_MAX: usize = 1;
+
+// This creates a default app-descriptor required by the esp-idf bootloader.
+// For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
+esp_bootloader_esp_idf::esp_app_desc!();
+
+#[allow(
+    clippy::large_stack_frames,
+    reason = "it's not unusual to allocate larger buffers etc. in main"
+)]
+#[esp_rtos::main]
+async fn main(spawner: Spawner) -> ! {
+    // generator version: 1.2.0
 
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: 66320);
+    // COEX needs more RAM - so we've added some more
+    esp_alloc::heap_allocator!(size: 64 * 1024);
 
-    let timer0 = SystemTimer::new(peripherals.SYSTIMER);
-    esp_hal_embassy::init(timer0.alarm0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let sw_interrupt =
+        esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
 
-    let timer1 = TimerGroup::new(peripherals.TIMG0);
-    let _init = esp_wifi::init(
-        timer1.timer0,
-        esp_hal::rng::Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
-    println!("Hallo Welt!1");
-    let rmt = Rmt::new(peripherals.RMT, Rate::from_mhz(80)).unwrap();
-    println!("Hallo Welt!1.1");
-    let rmt_buffer = smart_led_buffer!(3);
-    println!("Hallo Welt!1.2");
-    let mut led = SmartLedsAdapter::new(rmt.channel0, peripherals.GPIO4, rmt_buffer);
-    println!("Hallo Welt!1.3");
-    // led.write(
-    //     core::iter::repeat(RGB {
-    //         r: 255u8,
-    //         g: 0u8,
-    //         b: 0u8,
-    //     })
-    //     .take(4),
-    // )
-    // .unwrap();
-    println!("Hallo Welt!2");
+    info!("Embassy initialized!");
 
-    let ledc = Ledc::new(peripherals.LEDC);
-    let mut ledtimer1 = ledc.timer::<LowSpeed>(esp_hal::ledc::timer::Number::Timer0);
-    ledtimer1
-        .configure(timer::config::Config {
-            duty: timer::config::Duty::Duty10Bit,
-            clock_source: timer::LSClockSource::APBClk,
-            frequency: Rate::from_khz(1),
-        })
-        .unwrap();
-    let mut channel0 =
-        ledc.channel::<LowSpeed>(esp_hal::ledc::channel::Number::Channel0, peripherals.GPIO7);
-    channel0
-        .configure(channel::config::Config {
-            timer: &ledtimer1,
-            duty_pct: 80,
-            pin_config: channel::config::PinConfig::PushPull,
-        })
-        .unwrap();
-    println!("Hallo Welt!3");
-    Timer::after(Duration::from_secs(1)).await;
-    println!("Hallo Welt!4");
-    channel0.set_duty(0).unwrap();
+    let radio_init = esp_radio::init().expect("Failed to initialize Wi-Fi/BLE controller");
+    let (mut _wifi_controller, _interfaces) =
+        esp_radio::wifi::new(&radio_init, peripherals.WIFI, Default::default())
+            .expect("Failed to initialize Wi-Fi controller");
+    // find more examples https://github.com/embassy-rs/trouble/tree/main/examples/esp32
+    let transport = BleConnector::new(&radio_init, peripherals.BT, Default::default()).unwrap();
+    let ble_controller = ExternalController::<_, 1>::new(transport);
+    let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
+        HostResources::new();
+    let _stack = trouble_host::new(ble_controller, &mut resources);
 
     // TODO: Spawn some tasks
     let _ = spawner;
 
-    let btn = Input::new(peripherals.GPIO6, InputConfig::default().with_pull(Pull::Up));
+    let nvs: &'static Mutex<NoopRawMutex, Nvs> = firmware::mk_static!(Mutex<NoopRawMutex, Nvs>, Mutex::new(Nvs::new(firmware::NVS_OFFSET, firmware::NVS_SIZE, peripherals.FLASH).unwrap()));
+
+    // LEDC INIT
+    let mut ledc = Ledc::new(peripherals.LEDC);
+
+    let mut lstimer0 = ledc.timer::<LowSpeed>(timer::Number::Timer0);
+    lstimer0
+        .configure(timer::config::Config {
+            duty: timer::config::Duty::Duty5Bit,
+            clock_source: timer::LSClockSource::APBClk,
+            frequency: Rate::from_khz(24),
+        })
+        .unwrap();
+
+    // let mut fan1 = ledc.channel::<LowSpeed>(channel::Number::Channel0, peripherals.GPIO9);
+    // fan1.configure(channel::config::Config {
+    //     timer: &lstimer0,
+    //     duty_pct: 100,
+    //     drive_mode: esp_hal::gpio::DriveMode::PushPull,
+    // })
+    // .unwrap();
+    // fan1.set_duty(100).unwrap();
+
+    // let mut fan2 = ledc.channel::<LowSpeed>(channel::Number::Channel1, peripherals.GPIO10);
+    // fan2.configure(channel::config::Config {
+    //     timer: &lstimer0,
+    //     duty_pct: 100,
+    //     drive_mode: esp_hal::gpio::DriveMode::PushPull,
+    // })
+    // .unwrap();
+    // fan2.set_duty(100).unwrap();
+    let mut fan1 = Output::new(
+        peripherals.GPIO9,
+        esp_hal::gpio::Level::Low,
+        OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
+    );
+    fan1.set_high();
+    let mut fan2 = Output::new(
+        peripherals.GPIO10,
+        esp_hal::gpio::Level::Low,
+        OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
+    );
+    fan2.set_low();
+
+    let mut buzzer = ledc.channel::<LowSpeed>(channel::Number::Channel2, peripherals.GPIO7);
+    buzzer
+        .configure(channel::config::Config {
+            timer: &lstimer0,
+            duty_pct: 0,
+            drive_mode: esp_hal::gpio::DriveMode::PushPull,
+        })
+        .unwrap();
+
+    // i2c init
+    let i2c = I2C::I2c::new(
+        peripherals.I2C0,
+        I2C::Config::default().with_frequency(Rate::from_khz(100)),
+    )
+    .unwrap()
+    .with_sda(peripherals.GPIO20)
+    .with_scl(peripherals.GPIO21)
+    .into_async();
+
+    // let aht = AHT20::new(i2c, 0x34, embassy_time::Delay).await.unwrap();
+
+    // RGB LED init
+    let rmt_buffer: &'static mut [esp_hal::rmt::PulseCode; buffer_size(3)] = firmware::mk_static!(
+        [esp_hal::rmt::PulseCode; buffer_size(3)],
+        [esp_hal::rmt::PulseCode::default(); buffer_size(3)]
+    );
+    let mut led = {
+        let freq = Rate::from_mhz(80);
+        let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+        SmartLedsAdapter::new(rmt.channel0, peripherals.GPIO4, rmt_buffer)
+    };
+    led.write(core::iter::repeat(colors::RED).take(3)).unwrap();
+
+    // DS18B20 Init
+    let ow_pin = AnyPin::from(peripherals.GPIO8);
+    let mut ow_bus = OneWireBus::new(ow_pin);
+    let addr = ow_bus.find_first_device().unwrap();
+    let mut sen = Ds18b20::new(addr, ow_bus).unwrap();
 
     loop {
-        Timer::after(Duration::from_secs(1)).await;
-        println!("Hallo Welt!");
-        let btn_status = btn.is_high();
-        println!("Btn is high: {:?}", btn_status)
+        sen.start_temp_measurement().unwrap();
+        let wait_time_ms = esp_ds18b20::Resolution::Bits12.measurement_time_ms();
+        let wait_time = Duration::from_millis(wait_time_ms as u64);
+        Timer::after(wait_time).await;
+        let data = sen.read_sensor_data().unwrap();
+        info!("Data: {}", data.temperature);
     }
-
-    // for inspiration have a look at the examples at https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0-beta.0/examples/src/bin
 }
