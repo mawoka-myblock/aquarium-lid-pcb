@@ -6,7 +6,7 @@ esphome:
   name: "${name}"
   friendly_name: "${friendly_name}"
   name_add_mac_suffix: True
-  project: 
+  project:
     name: esphome.aquarium-fan-controller
     version: "0.1"
 
@@ -20,7 +20,6 @@ esp32:
 
 # Enable logging
 logger:
-
 
 ota:
   - platform: esphome
@@ -63,7 +62,7 @@ script:
                 id: is_hot_alarm
                 value: !lambda return is_high_alarm;
             - script.execute: play_siren_loop
-            - light.turn_on: 
+            - light.turn_on:
                 id: leds
                 effect: "Alarm Strobe"
   - id: disable_alarm
@@ -84,7 +83,6 @@ script:
                 auto name = to_string((int) id(led_standby_brightness).state) + "% Pulse";
                 call.set_effect(name);
                 call.perform();
-
 
 fan:
   - platform: speed
@@ -109,7 +107,7 @@ binary_sensor:
         input: True
       inverted: True
     name: Button
-    on_click: 
+    on_click:
       - min_length: 1500ms
         max_length: 5s
         then:
@@ -137,9 +135,6 @@ binary_sensor:
     lambda: return id(alarm_triggered);
     web_server:
       sorting_group_id: sg_status
-
-
-      
 
 globals:
   - id: alarm_triggered
@@ -180,72 +175,41 @@ light:
     bit1_low: 2000ns
     restore_mode: RESTORE_DEFAULT_ON
     effects:
-        - addressable_rainbow:
-        - strobe:
-            name: "Alarm Strobe"
-            colors:
-              - state: true
-                brightness: 100%
-                red: 100%
-                green: 0%
-                blue: 0%
-                duration: 1s
-              - state: false
-                duration: 1s
-            
-        - pulse:
-            name: 10% Pulse
-            transition_length: 3s
-            update_interval: 3s
-            max_brightness: 10%
-        - pulse:
-            name: 20% Pulse
-            transition_length: 3s
-            update_interval: 3s
-            max_brightness: 20%
-        - pulse:
-            name: 30% Pulse
-            transition_length: 3s
-            update_interval: 3s
-            max_brightness: 30%
-        - pulse:
-            name: 40% Pulse
-            transition_length: 3s
-            update_interval: 3s
-            max_brightness: 40%
-        - pulse:
-            name: 50% Pulse
-            transition_length: 3s
-            update_interval: 3s
-            max_brightness: 50%
-        - pulse:
-            name: 60% Pulse
-            transition_length: 3s
-            update_interval: 3s
-            max_brightness: 60%
-        - pulse:
-            name: 70% Pulse
-            transition_length: 3s
-            update_interval: 3s
-            max_brightness: 70%
-        - pulse:
-            name: 80% Pulse
-            transition_length: 3s
-            update_interval: 3s
-            max_brightness: 80%
-        - pulse:
-            name: 90% Pulse
-            transition_length: 3s
-            update_interval: 3s
-            max_brightness: 90%
-        - pulse:
-            name: 100% Pulse
-            transition_length: 3s
-            update_interval: 3s
-            max_brightness: 100%
+      - addressable_rainbow:
+      - strobe:
+          name: "Alarm Strobe"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 100%
+              green: 0%
+              blue: 0%
+              duration: 1s
+            - state: false
+              duration: 1s
+
+      - pulse:
+          name: 10% Pulse
+          transition_length: 3s
+          update_interval: 3s
+          max_brightness: 10%
+      - pulse:
+          name: 30% Pulse
+          transition_length: 3s
+          update_interval: 3s
+          max_brightness: 30%
+      - pulse:
+          name: 60% Pulse
+          transition_length: 3s
+          update_interval: 3s
+          max_brightness: 60%
+      - pulse:
+          name: 100% Pulse
+          transition_length: 3s
+          update_interval: 3s
+          max_brightness: 100%
     web_server:
       sorting_group_id: sg_manual_control
-
 
 web_server:
   port: 80
@@ -263,6 +227,11 @@ web_server:
 one_wire:
   - platform: gpio
     pin: GPIO8
+
+i2c:
+  sda: GPIO20
+  scl: GPIO21
+
 sensor:
   - platform: dallas_temp
     name: Temperature
@@ -301,6 +270,12 @@ sensor:
                     - script.execute: disable_alarm
     web_server:
       sorting_group_id: sg_status
+  - platform: aht10
+    variant: AHT20
+    temperature: 
+      name: Aquarium External Temperature
+    humidity: 
+      name: Aquarium External Humidity
 
 number:
   - platform: template
@@ -346,7 +321,6 @@ number:
     restore_value: True
     web_server:
       sorting_group_id: sg_settings
-        
 
 select:
   - platform: template
@@ -371,12 +345,12 @@ switch:
   - platform: template
     name: "Silence Alarm"
     lambda: return id(alarm_silenced);
-    turn_on_action: 
+    turn_on_action:
       then:
         - globals.set:
             id: alarm_silenced
             value: "true"
-    turn_off_action: 
+    turn_off_action:
       then:
         - globals.set:
             id: alarm_silenced
