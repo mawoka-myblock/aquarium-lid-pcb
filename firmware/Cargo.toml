@@ -81,6 +81,7 @@ portable-atomic = { version = "1.13", default-features = false }
 tickv = { version = "2" }
 anyhow = { version = "*", default-features = false }
 esp-storage = { version  = "*", features = ["esp32c3"] }
+embassy-futures = { version = "*" }
 
 
 [profile.dev]

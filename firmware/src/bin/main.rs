@@ -1,11 +1,15 @@
-#![no_std]
 #![no_main]
+#![no_std]
 #![deny(
     clippy::mem_forget,
     reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
     holding buffers for the duration of a data transfer."
 )]
 #![deny(clippy::large_stack_frames)]
+
+// --- move tasks to separate modules ---
+
+// Unified Pub/Sub channel for inter-task communication
 
 use aht20::AHT20;
 use bt_hci::controller::ExternalController;
@@ -15,6 +19,7 @@ use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_time::{Duration, Timer};
 use esp_ds18b20::Ds18b20;
+use esp_hal::Async;
 use esp_hal::gpio::{AnyPin, Output, OutputConfig};
 use esp_hal::i2c::master::{self as I2C};
 use esp_hal::ledc::channel::ChannelIFace;
@@ -30,7 +35,10 @@ use esp_hal_smartled::{SmartLedsAdapter, buffer_size, smart_led_buffer};
 use esp_onewire::OneWireBus;
 use esp_radio::ble::controller::BleConnector;
 use firmware::storage::nvs::Nvs;
-use smart_leds::{SmartLedsWrite, colors};
+use firmware::tasks::fan::{control_fan, fan_task};
+use firmware::tasks::led::led_task;
+use firmware::tasks::measure::{air_data_task, water_temp_task};
+
 use trouble_host::prelude::*;
 use {esp_backtrace as _, esp_println as _};
 
@@ -76,8 +84,8 @@ async fn main(spawner: Spawner) -> ! {
         HostResources::new();
     let _stack = trouble_host::new(ble_controller, &mut resources);
 
-    // TODO: Spawn some tasks
-    let _ = spawner;
+    // Set up Pub/Sub channel and spawn tasks
+    // Fan task listens on pubsub
 
     let nvs: &'static Mutex<NoopRawMutex, Nvs> = firmware::mk_static!(Mutex<NoopRawMutex, Nvs>, Mutex::new(Nvs::new(firmware::NVS_OFFSET, firmware::NVS_SIZE, peripherals.FLASH).unwrap()));
 
@@ -110,64 +118,87 @@ async fn main(spawner: Spawner) -> ! {
     // })
     // .unwrap();
     // fan2.set_duty(100).unwrap();
-    let mut fan1 = Output::new(
-        peripherals.GPIO9,
-        esp_hal::gpio::Level::Low,
-        OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
+    let fan1: &'static mut Output<'static> = firmware::mk_static!(
+        Output<'static>,
+        Output::new(
+            peripherals.GPIO9,
+            esp_hal::gpio::Level::Low,
+            OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
+        )
     );
-    fan1.set_high();
-    let mut fan2 = Output::new(
-        peripherals.GPIO10,
-        esp_hal::gpio::Level::Low,
-        OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
+    let fan2: &'static mut Output<'static> = firmware::mk_static!(
+        Output<'static>,
+        Output::new(
+            peripherals.GPIO10,
+            esp_hal::gpio::Level::Low,
+            OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
+        )
     );
-    fan2.set_low();
 
-    let mut buzzer = ledc.channel::<LowSpeed>(channel::Number::Channel2, peripherals.GPIO7);
-    buzzer
-        .configure(channel::config::Config {
-            timer: &lstimer0,
-            duty_pct: 0,
-            drive_mode: esp_hal::gpio::DriveMode::PushPull,
-        })
-        .unwrap();
+    // let mut buzzer = ledc.channel::<LowSpeed>(channel::Number::Channel0, peripherals.GPIO7);
+    // buzzer
+    //     .configure(channel::config::Config {
+    //         timer: &lstimer0,
+    //         duty_pct: 80,
+    //         drive_mode: esp_hal::gpio::DriveMode::PushPull,
+    //     })
+    //     .unwrap();
+    let buzzer = Output::new(
+        peripherals.GPIO7,
+        esp_hal::gpio::Level::Low,
+        OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
+    );
 
     // i2c init
-    let i2c = I2C::I2c::new(
-        peripherals.I2C0,
-        I2C::Config::default().with_frequency(Rate::from_khz(100)),
-    )
-    .unwrap()
-    .with_sda(peripherals.GPIO20)
-    .with_scl(peripherals.GPIO21)
-    .into_async();
+    let i2c: &'static mut I2C::I2c<'static, Async> = firmware::mk_static!(
+        I2C::I2c<'static, Async>,
+        I2C::I2c::new(
+            peripherals.I2C0,
+            I2C::Config::default().with_frequency(Rate::from_khz(100)),
+        )
+        .unwrap()
+        .with_sda(peripherals.GPIO20)
+        .with_scl(peripherals.GPIO21)
+        .into_async()
+    );
 
-    // let aht = AHT20::new(i2c, 0x34, embassy_time::Delay).await.unwrap();
+    // let aht: &'static mut AHT20<&'static mut I2C::I2c<'static, Async>, embassy_time::Delay> = firmware::mk_static!(
+    //     AHT20<&'static mut I2C::I2c<'static, Async>, embassy_time::Delay>,
+    //     AHT20::new(i2c, 0x34, embassy_time::Delay).await.unwrap()
+    // );
 
     // RGB LED init
     let rmt_buffer: &'static mut [esp_hal::rmt::PulseCode; buffer_size(3)] = firmware::mk_static!(
         [esp_hal::rmt::PulseCode; buffer_size(3)],
         [esp_hal::rmt::PulseCode::default(); buffer_size(3)]
     );
-    let mut led = {
-        let freq = Rate::from_mhz(80);
-        let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
-        SmartLedsAdapter::new(rmt.channel0, peripherals.GPIO4, rmt_buffer)
-    };
-    led.write(core::iter::repeat(colors::RED).take(3)).unwrap();
+    let led: &'static mut SmartLedsAdapter<'static, { buffer_size(3) }> =
+        firmware::mk_static!(SmartLedsAdapter<'static, { buffer_size(3) }>, {
+            let freq = Rate::from_mhz(80);
+            let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+            SmartLedsAdapter::new(rmt.channel0, peripherals.GPIO4, rmt_buffer)
+        });
 
     // DS18B20 Init
     let ow_pin = AnyPin::from(peripherals.GPIO8);
     let mut ow_bus = OneWireBus::new(ow_pin);
     let addr = ow_bus.find_first_device().unwrap();
-    let mut sen = Ds18b20::new(addr, ow_bus).unwrap();
+    let sen: &'static mut Ds18b20 =
+        firmware::mk_static!(Ds18b20, Ds18b20::new(addr, ow_bus).unwrap());
+
+    spawner.spawn(fan_task(fan1, fan2)).unwrap();
+    spawner.spawn(water_temp_task(sen)).unwrap();
+    spawner.spawn(control_fan()).unwrap();
+    spawner.spawn(led_task(led)).unwrap();
+    // spawner.spawn(air_data_task(aht)).unwrap();
 
     loop {
-        sen.start_temp_measurement().unwrap();
+        // sen.start_temp_measurement().unwrap();
         let wait_time_ms = esp_ds18b20::Resolution::Bits12.measurement_time_ms();
-        let wait_time = Duration::from_millis(wait_time_ms as u64);
-        Timer::after(wait_time).await;
-        let data = sen.read_sensor_data().unwrap();
-        info!("Data: {}", data.temperature);
+        // let wait_time = Duration::from_millis(wait_time_ms as u64);
+        // Timer::after(wait_time).await;
+        // let data = sen.read_sensor_data().unwrap();
+        // info!("Data: {}", data.temperature);
+        Timer::after_millis(1000).await
     }
 }
