@@ -4,24 +4,54 @@ use embassy_time::{Delay, Timer};
 use esp_ds18b20::Ds18b20;
 use esp_hal::{Async, i2c::master::I2c};
 
-use crate::{AirData, DATACHANNEL};
+use crate::{AirData, DATACHANNEL, WATER_TEMP_SIGNAL};
 
 #[embassy_executor::task]
 pub async fn water_temp_task(ds: &'static mut Ds18b20) {
     let publisher = DATACHANNEL.publisher().unwrap();
+    let watch_publisher = WATER_TEMP_SIGNAL.sender();
+
     loop {
-        ds.start_temp_measurement().unwrap();
-        Timer::after_millis(1000).await;
-        let res = match ds.read_sensor_data() {
-            Ok(d) => d.temperature,
-            Err(e) => {
-                defmt::error!("{:?}", Debug2Format(&e));
-                -255.0
+        if let Err(e) = ds.start_temp_measurement() {
+            defmt::error!("start_temp_measurement failed: {:?}", Debug2Format(&e));
+            Timer::after_millis(200).await;
+            continue;
+        }
+
+        Timer::after_millis(750).await;
+
+        let mut value = None;
+
+        for attempt in 0..3 {
+            match ds.read_sensor_data() {
+                Ok(d) => {
+                    value = Some(d.temperature);
+                    break;
+                }
+                Err(e) => {
+                    defmt::debug!(
+                        "read_sensor_data failed (attempt {}): {:?}",
+                        attempt + 1,
+                        Debug2Format(&e)
+                    );
+                    Timer::after_millis(50).await;
+                }
+            }
+        }
+
+        match value {
+            Some(t) => {
+                publisher
+                    .publish(crate::DataMessage::WaterTemperature(t))
+                    .await;
+                watch_publisher.send(t);
+            }
+            None => {
+                defmt::error!("read_sensor_data failed after retries")
             }
         };
-        publisher
-            .publish(crate::DataMessage::WaterTemperature(res))
-            .await;
+
+        Timer::after_millis(1000).await;
     }
 }
 

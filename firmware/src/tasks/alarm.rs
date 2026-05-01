@@ -1,4 +1,4 @@
-use crate::{COMMANDS, Command, DATACHANNEL, FAN_STATE_ON_SIGNAL, FanThreshold, LedCommand};
+use crate::{AlarmThreshold, COMMANDS, Command, DATACHANNEL, LedCommand};
 use defmt::info;
 
 use embassy_futures::join::join;
@@ -7,37 +7,30 @@ use esp_hal::gpio::Output;
 use smart_leds::colors;
 
 #[embassy_executor::task]
-pub async fn fan_task(fan1: &'static mut Output<'static>, fan2: &'static mut Output<'static>) {
+pub async fn fan_task(_buzzer: &'static mut Output<'static>) {
     let mut sub = COMMANDS.subscriber().unwrap();
-    let signal_pub = FAN_STATE_ON_SIGNAL.sender();
     loop {
         let msg = sub.next_message_pure().await;
         match msg {
-            Command::FanOn => {
-                fan1.set_high();
-                fan2.set_high();
-                info!("Fan turned on");
-                signal_pub.send(true);
+            Command::BuzzerOn => {
+                info!("Buzzer turned on");
             }
-            Command::FanOff => {
-                fan1.set_low();
-                fan2.set_low();
-                info!("Fan turned off");
-                signal_pub.send(false);
+            Command::BuzzerOff => {
+                info!("Buzzer turned off");
             }
             _ => {}
         }
     }
 }
 
-static FAN_THRESHOLD_SIGNAL: Signal<CriticalSectionRawMutex, FanThreshold> = Signal::new();
+static FAN_THRESHOLD_SIGNAL: Signal<CriticalSectionRawMutex, AlarmThreshold> = Signal::new();
 
 #[embassy_executor::task]
 pub async fn control_fan(cfg: &'static crate::Config) {
     let data_loop = async {
         let mut sub_data = DATACHANNEL.subscriber().unwrap();
         let cmd_pub = COMMANDS.publisher().unwrap();
-        let mut thresholds = FanThreshold::from_cfg(cfg);
+        let mut thresholds = AlarmThreshold::from_cfg(cfg);
         let mut prev_on = false;
         loop {
             if let Some(new_thr) = FAN_THRESHOLD_SIGNAL.try_take() {
@@ -48,22 +41,16 @@ pub async fn control_fan(cfg: &'static crate::Config) {
                 crate::DataMessage::WaterTemperature(d) => d,
                 _ => continue,
             };
-            let current_on = if temp >= thresholds.fan_on {
-                true
-            } else if temp <= thresholds.fan_off {
-                false
-            } else {
-                prev_on
-            };
+            let current_on = temp > thresholds.alarm_above || temp < thresholds.alarm_below;
 
             if current_on != prev_on {
                 if current_on {
-                    cmd_pub.publish(Command::FanOn).await;
+                    cmd_pub.publish(Command::BuzzerOn).await;
                     cmd_pub
                         .publish(Command::SetLeds(LedCommand::AllColor(colors::RED)))
                         .await;
                 } else {
-                    cmd_pub.publish(Command::FanOff).await;
+                    cmd_pub.publish(Command::BuzzerOff).await;
                     cmd_pub
                         .publish(Command::SetLeds(LedCommand::AllColor(colors::GREEN)))
                         .await;
@@ -81,17 +68,17 @@ pub async fn control_fan(cfg: &'static crate::Config) {
                 Command::Reconfigure(d) => d,
                 _ => continue,
             };
-            FAN_THRESHOLD_SIGNAL.signal(FanThreshold::from_cfg(&d));
+            FAN_THRESHOLD_SIGNAL.signal(AlarmThreshold::from_cfg(&d));
         }
     };
     join(data_loop, cmd_loop).await;
 }
 
-impl FanThreshold {
-    fn from_cfg(config: &crate::Config) -> Self {
-        FanThreshold {
-            fan_on: config.fan_on_threshold,
-            fan_off: config.fan_off_threshold,
+impl AlarmThreshold {
+    fn from_cfg(cfg: &crate::Config) -> Self {
+        Self {
+            alarm_above: cfg.alarm_above,
+            alarm_below: cfg.alarm_below,
         }
     }
 }
