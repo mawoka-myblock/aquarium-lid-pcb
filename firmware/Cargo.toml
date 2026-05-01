@@ -97,7 +97,8 @@ itoa = { version = "1" }
 picoserve = { version = "0.18", features = ["embassy", "defmt", "json"] }
 postcard = { version = "1", features = ["use-crc"] }
 crc = { version = "*" }
-embedded-mqttc = { git = "https://github.com/mawoka-myblock/embedded-mqttc.git", branch = "update-embassy", default-features = false, features = ["embassy", "ipv4", "defmt"] }
+# embedded-mqttc = { git = "https://github.com/mawoka-myblock/embedded-mqttc.git", branch = "update-embassy", default-features = false, features = ["embassy", "ipv4", "defmt"] }
+embedded-mqttc = { path = "../../embedded-mqttc", default-features = false, features = ["embassy", "ipv4", "defmt"] }
 
 [profile.dev]
 # Rust debug is too slow.

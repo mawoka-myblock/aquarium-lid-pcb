@@ -38,16 +38,16 @@ use esp_hal_smartled::{Ws2812SmartLeds, buffer_size};
 use esp_onewire::OneWireBus;
 use esp_radio::ble::controller::BleConnector;
 use esp_radio::wifi::sta::StationConfig;
-use firmware::bt::improv_ble;
 use firmware::storage::config::{MqttData, WifiCreds};
 use firmware::storage::nvs::Nvs;
-use firmware::tasks::config::config_task;
+use firmware::tasks::config;
 use firmware::tasks::fan::{control_fan, fan_task};
 use firmware::tasks::http::AppProps;
 use firmware::tasks::led::led_task;
 use firmware::tasks::measure::water_temp_task;
 use firmware::tasks::network::net_task;
 use firmware::{COMMANDS, NvsMutex, mk_static};
+use firmware::{bt::improv_ble, tasks::mqtt};
 use picoserve::AppBuilder;
 use static_cell::StaticCell;
 
@@ -202,7 +202,8 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(water_temp_task(sen).unwrap());
     spawner.spawn(control_fan(cfg).unwrap());
     spawner.spawn(led_task(led, cfg).unwrap());
-    spawner.spawn(config_task(cfg, nvs).unwrap());
+    spawner.spawn(config::config_task(cfg, nvs).unwrap());
+    spawner.spawn(config::config_mqtt_task(nvs).unwrap());
     // spawner.spawn(air_data_task(aht)).unwrap();
     //
     Timer::after_millis(1000).await;
@@ -230,8 +231,8 @@ async fn main(spawner: Spawner) -> ! {
             interfaces.station,
             config,
             firmware::mk_static!(
-                embassy_net::StackResources<12>,
-                embassy_net::StackResources::<12>::new()
+                embassy_net::StackResources<16>,
+                embassy_net::StackResources::<16>::new()
             ),
             seed,
         );
@@ -282,6 +283,9 @@ async fn main(spawner: Spawner) -> ! {
                     dns_client,
                 )
             });
+            spawner.spawn(mqtt::run_mqtt_loop(mqtt_state).unwrap());
+            spawner.spawn(mqtt::listen_commandchannel(mqtt_state.new_client()).unwrap());
+            spawner.spawn(mqtt::listen_datachannel(mqtt_state.new_client()).unwrap());
         }
     } else {
         spawner.spawn(improv_ble(ble_controller, wifi_controller, interfaces, nvs).unwrap());

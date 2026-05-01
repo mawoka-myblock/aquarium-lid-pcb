@@ -95,7 +95,7 @@ impl WifiCreds {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct MqttData {
     pub host: String<64>,
     pub port: Option<u16>,

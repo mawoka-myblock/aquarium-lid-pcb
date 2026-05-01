@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use smart_leds::RGB8;
 use static_cell::StaticCell;
 
-use crate::storage::nvs::Nvs;
+use crate::storage::{config::MqttData, nvs::Nvs};
 
 extern crate alloc;
 
@@ -48,6 +48,7 @@ pub enum Command {
     BuzzerOn,
     BuzzerOff,
     Reconfigure(Config),
+    SetMqttConfig(MqttData),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,7 +83,7 @@ pub enum DataMessage {
     AirData(Option<AirData>),
 }
 
-pub type CommandChannel = PubSubChannel<CriticalSectionRawMutex, Command, 4, 4, 4>;
+pub type CommandChannel = PubSubChannel<CriticalSectionRawMutex, Command, 4, 6, 6>;
 
 pub static COMMANDS: CommandChannel = CommandChannel::new();
 

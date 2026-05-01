@@ -1,8 +1,13 @@
-use picoserve::{extract::Json, response::IntoResponse, routing::get};
+use picoserve::{
+    extract::Json,
+    response::IntoResponse,
+    routing::{get, post},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    COMMANDS, CONFIG_SIGNAL, FAN_STATE_ON_SIGNAL, WATER_TEMP_SIGNAL, tasks::http::AppState,
+    COMMANDS, CONFIG_SIGNAL, FAN_STATE_ON_SIGNAL, WATER_TEMP_SIGNAL, storage::config::MqttData,
+    tasks::http::AppState,
 };
 
 pub fn api_router() -> picoserve::Router<impl picoserve::routing::PathRouter<AppState>, AppState> {
@@ -10,6 +15,7 @@ pub fn api_router() -> picoserve::Router<impl picoserve::routing::PathRouter<App
         .route("/config", get(get_config).post(set_config))
         .route("/data/water", get(get_water_temperature))
         .route("/fan", get(get_fan).post(set_fan))
+        .route("/mqtt", post(set_mqtt))
 }
 
 async fn get_config() -> impl IntoResponse {
@@ -57,4 +63,10 @@ async fn get_fan() -> impl IntoResponse {
             .try_get()
             .unwrap_or_default(),
     })
+}
+
+async fn set_mqtt(Json(data): Json<MqttData>) -> impl IntoResponse {
+    COMMANDS
+        .immediate_publisher()
+        .publish_immediate(crate::Command::SetMqttConfig(data));
 }
