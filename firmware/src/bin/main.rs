@@ -286,6 +286,8 @@ async fn main(spawner: Spawner) -> ! {
             spawner.spawn(mqtt::run_mqtt_loop(mqtt_state).unwrap());
             spawner.spawn(mqtt::listen_commandchannel(mqtt_state.new_client()).unwrap());
             spawner.spawn(mqtt::listen_datachannel(mqtt_state.new_client()).unwrap());
+            spawner.spawn(mqtt::listen_mqtt(mqtt_state.new_client()).unwrap());
+            mqtt::publish_discovery(mqtt_state.new_client()).await;
         }
     } else {
         spawner.spawn(improv_ble(ble_controller, wifi_controller, interfaces, nvs).unwrap());

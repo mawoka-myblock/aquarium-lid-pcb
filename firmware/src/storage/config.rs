@@ -1,13 +1,13 @@
 use core::net::IpAddr;
 
 use crc::{CRC_32_ISCSI, Crc};
-use defmt::Format;
+use defmt::{Format, unwrap};
 use embedded_mqttc::{ClientConfig, ClientCredentials, Host};
 use heapless::{String, Vec};
 use postcard::{from_bytes_crc32, to_slice_crc32};
 use serde::{Deserialize, Serialize};
 
-use crate::{Config, NvsMutex};
+use crate::{CONFIG_SIGNAL, Config, NvsMutex};
 
 impl Config {
     pub async fn from_nvs(nvs_mutex: NvsMutex) -> Self {
@@ -39,6 +39,11 @@ impl Config {
             let _ = nvs.invalidate_key(b"CFG").await;
             nvs.append_key(b"CFG", res).await.unwrap();
         }
+    }
+
+    pub fn get_from_signal() -> Self {
+        let mut recv = CONFIG_SIGNAL.anon_receiver();
+        unwrap!(recv.try_get())
     }
 }
 

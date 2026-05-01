@@ -745,6 +745,7 @@ dependencies = [
 [[package]]
 name = "embedded-mqttc"
 version = "1.0.1"
+source = "git+https://github.com/mawoka-myblock/embedded-mqttc.git?branch=update-embassy#bc0c9c907b62c9bc6e46181531d7ec13c20a3f53"
 dependencies = [
  "defmt 0.3.100",
  "embassy-futures",
