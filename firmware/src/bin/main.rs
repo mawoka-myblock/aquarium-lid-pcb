@@ -21,7 +21,6 @@ use embassy_net::{
 };
 use embassy_sync::mutex::Mutex;
 use embassy_time::Timer;
-use embedded_mqttc::ClientConfig;
 use esp_ds18b20::Ds18b20;
 use esp_hal::Async;
 use esp_hal::gpio::{AnyPin, Output, OutputConfig};

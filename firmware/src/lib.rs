@@ -58,7 +58,7 @@ pub enum LedCommand {
     BlinkIdentify,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AirData {
     pub temperature: f32,
     pub humidity: f32,
@@ -122,3 +122,8 @@ pub static WATER_TEMP_SIGNAL: Watch<CriticalSectionRawMutex, f32, 1> = Watch::ne
 pub static FAN_STATE_ON_SIGNAL: Watch<CriticalSectionRawMutex, bool, 1> = Watch::new();
 
 pub type NvsMutex = &'static Mutex<CriticalSectionRawMutex, Nvs>;
+
+#[derive(Serialize, Debug)]
+pub struct WaterTemperatureResponse {
+    pub temp: Option<f32>,
+}

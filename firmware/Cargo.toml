@@ -54,7 +54,7 @@ esp-radio = { version = "0.18.0", features = [
   "unstable",
   "wifi",
 ] }
-smoltcp = { version = "0.12.0", default-features = false, features = [
+smoltcp = { version = "0.13", default-features = false, features = [
   "defmt",
   "medium-ethernet",
   "multicast",
@@ -87,7 +87,7 @@ embassy-sync = { version = "0.8" }
 portable-atomic = { version = "1.13", default-features = false }
 tickv = { version = "2" }
 anyhow = { version = "*", default-features = false }
-esp-storage = { version  = "*", features = ["esp32c3"] }
+esp-storage = { version  = "0.9", features = ["esp32c3"] }
 embassy-futures = { version = "*" }
 sine_macro = { version = "0.1" }
 heapless = { version = "*", features = ["serde"] }
