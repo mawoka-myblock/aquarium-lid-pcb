@@ -130,28 +130,25 @@ impl Nvs {
         buf: &[u8],
     ) -> anyhow::Result<(), ErrorCode> {
         let res = self.tickv.append_key(hash(key), buf);
-        if let Err(e) = res {
-            if e == ErrorCode::UnsupportedVersion {
-                defmt::error!(
-                    "Unsupported version while appending flash key... Wiping NVS partition!"
-                );
+        if let Err(e) = res
+            && e == ErrorCode::UnsupportedVersion
+        {
+            defmt::error!("Unsupported version while appending flash key... Wiping NVS partition!");
 
-                let mut flash = esp_storage::FlashStorage::new(unsafe {
-                    self.flash_peripheral.clone_unchecked()
-                });
-                let mut written = 0;
+            let mut flash =
+                esp_storage::FlashStorage::new(unsafe { self.flash_peripheral.clone_unchecked() });
+            let mut written = 0;
 
-                while written < self.size {
-                    let chunk = [0; 1024];
-                    let chunk_size = (self.size - written).min(1024);
+            while written < self.size {
+                let chunk = [0; 1024];
+                let chunk_size = (self.size - written).min(1024);
 
-                    _ = flash.write((self.offset + written) as u32, &chunk[..chunk_size]);
-                    written += chunk_size;
-                }
-
-                self.tickv.initialise(hash(tickv::MAIN_KEY))?;
-                self.tickv.append_key(hash(key), buf)?;
+                _ = flash.write((self.offset + written) as u32, &chunk[..chunk_size]);
+                written += chunk_size;
             }
+
+            self.tickv.initialise(hash(tickv::MAIN_KEY))?;
+            self.tickv.append_key(hash(key), buf)?;
         }
 
         Ok(())

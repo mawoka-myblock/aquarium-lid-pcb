@@ -13,7 +13,7 @@
 
 // use aht20::AHT20;
 use bt_hci::controller::ExternalController;
-use defmt::{Debug2Format, info};
+use defmt::{info, unwrap};
 use embassy_executor::Spawner;
 use embassy_net::{
     dns::DnsSocket,
@@ -22,14 +22,16 @@ use embassy_net::{
 use embassy_sync::mutex::Mutex;
 use embassy_time::Timer;
 use esp_ds18b20::Ds18b20;
-use esp_hal::Async;
-use esp_hal::gpio::{AnyPin, Output, OutputConfig};
+use esp_hal::gpio::AnyPin;
 use esp_hal::i2c::master::{self as I2C};
+use esp_hal::ledc;
+use esp_hal::ledc::channel::ChannelIFace;
 use esp_hal::ledc::{Ledc, LowSpeed};
 use esp_hal::rmt::Rmt;
 use esp_hal::rng::Rng;
 use esp_hal::time::Rate;
 use esp_hal::timer::timg::TimerGroup;
+use esp_hal::{Async, ledc::channel::Channel};
 use esp_hal::{
     clock::CpuClock,
     ledc::timer::{self, TimerIFace},
@@ -104,9 +106,13 @@ async fn main(spawner: Spawner) -> ! {
         firmware::CONFIG.init(firmware::Config::from_nvs(nvs).await);
 
     // LEDC INIT
-    let ledc = Ledc::new(peripherals.LEDC);
+    let mut ledc = Ledc::new(peripherals.LEDC);
+    ledc.set_global_slow_clock(esp_hal::ledc::LSGlobalClkSource::APBClk);
 
-    let mut lstimer0 = ledc.timer::<LowSpeed>(timer::Number::Timer0);
+    let lstimer0: &'static mut ledc::timer::Timer<'static, LowSpeed> = firmware::mk_static!(
+        ledc::timer::Timer<'static, LowSpeed>,
+        ledc.timer::<LowSpeed>(timer::Number::Timer0)
+    );
     lstimer0
         .configure(timer::config::Config {
             duty: timer::config::Duty::Duty5Bit,
@@ -115,53 +121,50 @@ async fn main(spawner: Spawner) -> ! {
         })
         .unwrap();
 
-    // let mut fan1 = ledc.channel::<LowSpeed>(channel::Number::Channel0, peripherals.GPIO9);
-    // fan1.configure(channel::config::Config {
-    //     timer: &lstimer0,
-    //     duty_pct: 100,
-    //     drive_mode: esp_hal::gpio::DriveMode::PushPull,
-    // })
-    // .unwrap();
-    // fan1.set_duty(100).unwrap();
+    let fan1: &'static mut Channel<'static, LowSpeed> = firmware::mk_static!(
+        Channel<'static, LowSpeed>,
+        ledc.channel::<LowSpeed>(ledc::channel::Number::Channel0, peripherals.GPIO9)
+    );
+    fan1.configure(ledc::channel::config::Config {
+        timer: lstimer0,
+        duty_pct: 0,
+        drive_mode: esp_hal::gpio::DriveMode::PushPull,
+    })
+    .unwrap();
 
-    // let mut fan2 = ledc.channel::<LowSpeed>(channel::Number::Channel1, peripherals.GPIO10);
-    // fan2.configure(channel::config::Config {
-    //     timer: &lstimer0,
-    //     duty_pct: 100,
-    //     drive_mode: esp_hal::gpio::DriveMode::PushPull,
-    // })
-    // .unwrap();
-    // fan2.set_duty(100).unwrap();
-    let fan1: &'static mut Output<'static> = firmware::mk_static!(
-        Output<'static>,
-        Output::new(
-            peripherals.GPIO9,
-            esp_hal::gpio::Level::Low,
-            OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
-        )
+    let fan2: &'static mut Channel<'static, LowSpeed> = firmware::mk_static!(
+        Channel<'static, LowSpeed>,
+        ledc.channel::<LowSpeed>(ledc::channel::Number::Channel1, peripherals.GPIO10)
     );
-    let fan2: &'static mut Output<'static> = firmware::mk_static!(
-        Output<'static>,
-        Output::new(
-            peripherals.GPIO10,
-            esp_hal::gpio::Level::Low,
-            OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
-        )
-    );
+    fan2.configure(ledc::channel::config::Config {
+        timer: lstimer0,
+        duty_pct: 0,
+        drive_mode: esp_hal::gpio::DriveMode::PushPull,
+    })
+    .unwrap();
 
-    // let mut buzzer = ledc.channel::<LowSpeed>(channel::Number::Channel0, peripherals.GPIO7);
-    // buzzer
-    //     .configure(channel::config::Config {
-    //         timer: &lstimer0,
-    //         duty_pct: 80,
-    //         drive_mode: esp_hal::gpio::DriveMode::PushPull,
-    //     })
-    //     .unwrap();
-    let _buzzer = Output::new(
-        peripherals.GPIO7,
-        esp_hal::gpio::Level::Low,
-        OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
-    );
+    let mut buzzer_timer = ledc.timer::<LowSpeed>(timer::Number::Timer1);
+    unwrap!(buzzer_timer.configure(timer::config::Config {
+        duty: timer::config::Duty::Duty10Bit,
+        clock_source: timer::LSClockSource::APBClk,
+        frequency: Rate::from_khz(2),
+    }));
+
+    let mut buzzer =
+        ledc.channel::<LowSpeed>(esp_hal::ledc::channel::Number::Channel3, peripherals.GPIO7);
+    buzzer
+        .configure(esp_hal::ledc::channel::config::Config {
+            timer: &buzzer_timer,
+            duty_pct: 0,
+            drive_mode: esp_hal::gpio::DriveMode::PushPull,
+        })
+        .unwrap();
+    info!("Playing");
+    // let _buzzer = Output::new(
+    //     peripherals.GPIO7,
+    //     esp_hal::gpio::Level::Low,
+    //     OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
+    // );
 
     // i2c init
     let _i2c: &'static mut I2C::I2c<'static, Async> = firmware::mk_static!(
@@ -246,13 +249,7 @@ async fn main(spawner: Spawner) -> ! {
         wifi_controller
             .set_power_saving(esp_radio::wifi::PowerSaveMode::Minimum)
             .unwrap();
-        match wifi_controller.connect_async().await {
-            Err(e) => {
-                defmt::error!("{:?}", Debug2Format(&e));
-                panic!();
-            }
-            _ => (),
-        };
+        unwrap!(wifi_controller.connect_async().await);
         spawner.spawn(net_task(runner).unwrap());
         info!("Waiting for IP...");
         loop {

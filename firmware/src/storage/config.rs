@@ -69,14 +69,11 @@ impl WifiCreds {
         let nvs = nvs_mutex.lock().await;
 
         let (ssid, passwd) = {
-            let ssid = nvs.get_key(b"WF_SSID").await.ok();
+            let ssid = nvs.get_key(b"WF_SSID").await.ok()?;
             let passwd = nvs.get_key(b"WF_PW").await.ok();
             (ssid, passwd)
         };
-        if ssid.is_none() {
-            return None;
-        }
-        let ssid_vec: Vec<u8, 32> = Vec::from_slice(&ssid.unwrap()[..32]).unwrap();
+        let ssid_vec: Vec<u8, 32> = Vec::from_slice(&ssid[..32]).unwrap();
         let mut passwd_vec: Vec<u8, 64> = Vec::new();
         if let Some(pw_slice) = passwd {
             passwd_vec.extend_from_slice(&pw_slice[..64]).unwrap();
@@ -136,14 +133,14 @@ impl MqttData {
         if let Some(d) = data_from_nvs {
             let crc = Crc::<u32>::new(&CRC_32_ISCSI);
             match from_bytes_crc32::<Self>(&d, crc.digest()) {
-                Ok(d) => return Some(d),
+                Ok(d) => Some(d),
                 Err(_) => {
                     defmt::error!("Couldn't read nvs MqttData data, using default");
-                    return None;
+                    None
                 }
             }
         } else {
-            return None;
+            None
         }
     }
 

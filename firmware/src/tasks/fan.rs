@@ -1,27 +1,34 @@
 use crate::{COMMANDS, Command, DATACHANNEL, FAN_STATE_ON_SIGNAL, FanThreshold, LedCommand};
 use defmt::info;
 
+use defmt::unwrap;
 use embassy_futures::join::join;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-use esp_hal::gpio::Output;
+use esp_hal::ledc::{
+    LowSpeed,
+    channel::{Channel, ChannelIFace},
+};
 use smart_leds::colors;
 
 #[embassy_executor::task]
-pub async fn fan_task(fan1: &'static mut Output<'static>, fan2: &'static mut Output<'static>) {
+pub async fn fan_task(
+    fan1: &'static mut Channel<'static, LowSpeed>,
+    fan2: &'static mut Channel<'static, LowSpeed>,
+) {
     let mut sub = COMMANDS.subscriber().unwrap();
     let signal_pub = FAN_STATE_ON_SIGNAL.sender();
     loop {
         let msg = sub.next_message_pure().await;
         match msg {
             Command::FanOn => {
-                fan1.set_high();
-                fan2.set_high();
+                unwrap!(fan1.set_duty(100));
+                unwrap!(fan2.set_duty(100));
                 info!("Fan turned on");
                 signal_pub.send(true);
             }
             Command::FanOff => {
-                fan1.set_low();
-                fan2.set_low();
+                fan1.set_duty(0).ok();
+                fan2.set_duty(0).ok();
                 info!("Fan turned off");
                 signal_pub.send(false);
             }

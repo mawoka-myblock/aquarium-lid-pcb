@@ -14,7 +14,7 @@ pub async fn run_mqtt_loop(mqtt_state: &'static StaticMqttState) {
     unwrap!(mqtt_state.run().await);
 }
 
-const BASE_TOPIC: &'static str = "aquarium";
+const BASE_TOPIC: &str = "aquarium";
 
 #[embassy_executor::task]
 pub async fn listen_datachannel(client: StaticMqttClient) {
@@ -126,31 +126,31 @@ pub async fn listen_mqtt(client: StaticMqttClient) {
         let parts: heapless::Vec<&str, 8> = msg.topic_name.split('/').collect();
         info!("Msg recvd, parts: {}", parts);
         match parts.as_slice() {
-            [BASE_TOPIC, "control", device, "set"] => match device {
-                &"fan" => match pl {
+            [BASE_TOPIC, "control", device, "set"] => match *device {
+                "fan" => match pl {
                     "ON" => cmd_pub.publish_immediate(crate::Command::FanOn),
                     "OFF" => cmd_pub.publish_immediate(crate::Command::FanOff),
                     _ => (),
                 },
-                &"buzzer" => match pl {
+                "buzzer" => match pl {
                     "ON" => cmd_pub.publish_immediate(crate::Command::BuzzerOn),
                     "OFF" => cmd_pub.publish_immediate(crate::Command::BuzzerOff),
                     _ => (),
                 },
                 _ => (),
             },
-            [BASE_TOPIC, "control", "config", action, "set"] => match action {
-                &"fan_above" => {
+            [BASE_TOPIC, "control", "config", action, "set"] => match *action {
+                "fan_above" => {
                     let mut cfg = crate::Config::get_from_signal();
                     cfg.fan_on_threshold = pl.parse::<f32>().unwrap();
                     cmd_pub.publish_immediate(crate::Command::Reconfigure(cfg));
                 }
-                &"fan_below" => {
+                "fan_below" => {
                     let mut cfg = crate::Config::get_from_signal();
                     cfg.fan_off_threshold = pl.parse::<f32>().unwrap();
                     cmd_pub.publish_immediate(crate::Command::Reconfigure(cfg));
                 }
-                &"led_brightness" => {
+                "led_brightness" => {
                     let mut cfg = crate::Config::get_from_signal();
                     cfg.led_brightness = pl.parse::<u8>().unwrap();
                     cmd_pub.publish_immediate(crate::Command::Reconfigure(cfg));

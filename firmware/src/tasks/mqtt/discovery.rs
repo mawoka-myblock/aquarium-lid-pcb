@@ -2,7 +2,7 @@ use embedded_mqttc::QoS;
 
 use crate::StaticMqttClient;
 
-const WATER_TEMP_CFG: &'static str = r#"
+const WATER_TEMP_CFG: &str = r#"
 {
 "name":"Water Temperature",
 "stat_t":"aquarium/sensor/water/state",
@@ -14,7 +14,7 @@ const WATER_TEMP_CFG: &'static str = r#"
 }
 "#;
 
-const AIR_TEMP_CFG: &'static str = r#"
+const AIR_TEMP_CFG: &str = r#"
 {
 "name":"Air Temperature",
 "stat_t":"aquarium/sensor/air/state",
@@ -25,7 +25,7 @@ const AIR_TEMP_CFG: &'static str = r#"
 }
 "#;
 
-const AIR_HUM_CFF: &'static str = r#"
+const AIR_HUM_CFF: &str = r#"
 {
 "name":"Air Humidity",
 "stat_t":"aquarium/sensor/air/state",
@@ -36,7 +36,7 @@ const AIR_HUM_CFF: &'static str = r#"
 }
 "#;
 
-const FAN_SWITCH: &'static str = r#"
+const FAN_SWITCH: &str = r#"
 {
 "name":"Fan Switch",
 "stat_t":"aquarium/control/fan/state",
@@ -48,7 +48,7 @@ const FAN_SWITCH: &'static str = r#"
 }
 "#;
 
-const BUZZER_SWITCH: &'static str = r#"
+const BUZZER_SWITCH: &str = r#"
 {
 "name":"Buzzer Switch",
 "stat_t":"aquarium/control/buzzer/state",
@@ -60,7 +60,7 @@ const BUZZER_SWITCH: &'static str = r#"
 }
 "#;
 
-const FAN_ON_ABOVE: &'static str = r#"
+const FAN_ON_ABOVE: &str = r#"
 {
 "name":"Fan On Threshold",
 "stat_t":"aquarium/sensor/config/state",
@@ -74,7 +74,7 @@ const FAN_ON_ABOVE: &'static str = r#"
 }
 "#;
 
-const FAN_OFF_BELOW: &'static str = r#"
+const FAN_OFF_BELOW: &str = r#"
 {
 "name":"Fan Off Threshold",
 "stat_t":"aquarium/sensor/config/state",
@@ -88,7 +88,7 @@ const FAN_OFF_BELOW: &'static str = r#"
 }
 "#;
 
-const LED_BRIGHTNESS: &'static str = r#"
+const LED_BRIGHTNESS: &str = r#"
 {
 "name":"LED Brightness",
 "stat_t":"aquarium/sensor/config/state",

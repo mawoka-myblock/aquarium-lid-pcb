@@ -67,7 +67,7 @@ impl Effect {
             }
 
             Effect::Pulse { color, step } => {
-                let v = BREATH[*step as usize];
+                let v = BREATH[*step];
                 let b = wave_to_brightness(v);
                 let scaled = RGB8 {
                     r: GAMMA8[((color.r as u16 * b as u16) >> 8) as usize],

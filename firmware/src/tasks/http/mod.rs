@@ -18,6 +18,12 @@ impl AppProps {
     }
 }
 
+impl Default for AppProps {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[embassy_executor::task(pool_size = WEB_TASK_POOL_SIZE)]
 pub async fn web_task(
     task_id: usize,

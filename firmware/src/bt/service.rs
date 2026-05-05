@@ -36,11 +36,10 @@ impl Improv {
             }
             _ => (),
         }
-        if let Some(lw) = long_write {
-            if lw.1 == self.rpc_command.handle {
-                self.run_command(lw.0, state).await;
-            }
-            return;
+        if let Some(lw) = long_write
+            && lw.1 == self.rpc_command.handle
+        {
+            self.run_command(lw.0, state).await;
         }
     }
 
@@ -51,7 +50,7 @@ impl Improv {
 
     async fn read_result(&self, server: &Server<'_>, state: &AppStateMutex) {
         let d = { &state.lock().await.rpc_result };
-        self.rpc_result.set(server, &d).unwrap();
+        self.rpc_result.set(server, d).unwrap();
     }
 
     async fn read_state(&self, server: &Server<'_>, state: &AppStateMutex) {
@@ -94,7 +93,6 @@ impl Improv {
                         .send(crate::bt::handler::RpcCommand::SetWifiCreds { ssid, password })
                         .await;
                 }
-                return;
             }
             // Identify
             [0x02, ..] => {

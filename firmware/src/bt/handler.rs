@@ -134,7 +134,7 @@ fn option_auth_to_string(am: Option<AuthenticationMethod>) -> String<32> {
         return String::from_str("NONE").unwrap();
     }
     let a = am.unwrap();
-    return String::from_str(match a {
+    String::from_str(match a {
         AuthenticationMethod::None => "NO",
         AuthenticationMethod::WapiPersonal => "WPA",
         AuthenticationMethod::Wep => "WEP",
@@ -146,5 +146,5 @@ fn option_auth_to_string(am: Option<AuthenticationMethod>) -> String<32> {
         AuthenticationMethod::Wpa3Personal => "WPA3",
         _ => "NO",
     })
-    .unwrap();
+    .unwrap()
 }

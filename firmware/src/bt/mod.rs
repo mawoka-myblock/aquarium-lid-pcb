@@ -412,12 +412,7 @@ async fn notify_result<P: PacketPool>(
         let _ = RESULT_SIGNAL.wait().await;
         info!("Received result");
         let result = { &state.lock().await.rpc_result };
-        server
-            .improv
-            .rpc_result
-            .notify(conn, &result)
-            .await
-            .unwrap();
+        server.improv.rpc_result.notify(conn, result).await.unwrap();
     }
 }
 
