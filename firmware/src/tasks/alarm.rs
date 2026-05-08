@@ -1,22 +1,32 @@
-use crate::{AlarmThreshold, COMMANDS, Command, DATACHANNEL, LedCommand};
-use defmt::info;
+use crate::{AlarmThreshold, BUZZER_ON_SIGNAL, COMMANDS, Command, DATACHANNEL, LedCommand};
+use defmt::unwrap;
 
 use embassy_futures::join::join;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-use esp_hal::gpio::Output;
+use esp_hal::ledc::{
+    LowSpeed,
+    channel::{Channel, ChannelIFace},
+    timer::Timer,
+};
 use smart_leds::colors;
 
 #[embassy_executor::task]
-pub async fn fan_task(_buzzer: &'static mut Output<'static>) {
+pub async fn fan_task(
+    buzzer: &'static mut Channel<'static, LowSpeed>,
+    _buzzer_timer: &'static mut Timer<'static, LowSpeed>,
+) {
     let mut sub = COMMANDS.subscriber().unwrap();
+    let buzzer_signal_pub = BUZZER_ON_SIGNAL.sender();
     loop {
         let msg = sub.next_message_pure().await;
         match msg {
             Command::BuzzerOn => {
-                info!("Buzzer turned on");
+                unwrap!(buzzer.set_duty(50));
+                buzzer_signal_pub.send(true);
             }
             Command::BuzzerOff => {
-                info!("Buzzer turned off");
+                unwrap!(buzzer.set_duty(0));
+                buzzer_signal_pub.send(false);
             }
             _ => {}
         }

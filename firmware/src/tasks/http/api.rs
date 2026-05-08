@@ -6,8 +6,8 @@ use picoserve::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    COMMANDS, CONFIG_SIGNAL, FAN_STATE_ON_SIGNAL, WATER_TEMP_SIGNAL, storage::config::MqttData,
-    tasks::http::AppState,
+    BUZZER_ON_SIGNAL, COMMANDS, CONFIG_SIGNAL, FAN_STATE_ON_SIGNAL, WATER_TEMP_SIGNAL,
+    storage::config::MqttData, tasks::http::AppState,
 };
 
 pub fn api_router() -> picoserve::Router<impl picoserve::routing::PathRouter<AppState>, AppState> {
@@ -15,6 +15,7 @@ pub fn api_router() -> picoserve::Router<impl picoserve::routing::PathRouter<App
         .route("/config", get(get_config).post(set_config))
         .route("/data/water", get(get_water_temperature))
         .route("/fan", get(get_fan).post(set_fan))
+        .route("/buzzer", get(get_buzzer).post(set_buzzer))
         .route("/mqtt", post(set_mqtt))
 }
 
@@ -69,4 +70,22 @@ async fn set_mqtt(Json(data): Json<MqttData>) -> impl IntoResponse {
     COMMANDS
         .immediate_publisher()
         .publish_immediate(crate::Command::SetMqttConfig(data));
+}
+
+async fn set_buzzer(Json(fan_data): Json<SetFan>) -> impl IntoResponse {
+    let cmd = match fan_data.on {
+        true => crate::Command::BuzzerOn,
+        false => crate::Command::BuzzerOff,
+    };
+    COMMANDS.immediate_publisher().publish_immediate(cmd);
+    picoserve::response::Json(fan_data)
+}
+
+async fn get_buzzer() -> impl IntoResponse {
+    picoserve::response::Json(SetFan {
+        on: BUZZER_ON_SIGNAL
+            .anon_receiver()
+            .try_get()
+            .unwrap_or_default(),
+    })
 }

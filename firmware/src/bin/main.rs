@@ -143,18 +143,23 @@ async fn main(spawner: Spawner) -> ! {
     })
     .unwrap();
 
-    let mut buzzer_timer = ledc.timer::<LowSpeed>(timer::Number::Timer1);
+    let buzzer_timer: &'static mut ledc::timer::Timer<'static, LowSpeed> = firmware::mk_static!(
+        ledc::timer::Timer<'static, LowSpeed>,
+        ledc.timer::<LowSpeed>(timer::Number::Timer1)
+    );
     unwrap!(buzzer_timer.configure(timer::config::Config {
         duty: timer::config::Duty::Duty10Bit,
         clock_source: timer::LSClockSource::APBClk,
         frequency: Rate::from_khz(2),
     }));
 
-    let mut buzzer =
-        ledc.channel::<LowSpeed>(esp_hal::ledc::channel::Number::Channel3, peripherals.GPIO7);
+    let buzzer: &'static mut Channel<'static, LowSpeed> = firmware::mk_static!(
+        Channel<'static, LowSpeed>,
+        ledc.channel::<LowSpeed>(esp_hal::ledc::channel::Number::Channel3, peripherals.GPIO7)
+    );
     buzzer
         .configure(esp_hal::ledc::channel::config::Config {
-            timer: &buzzer_timer,
+            timer: buzzer_timer,
             duty_pct: 0,
             drive_mode: esp_hal::gpio::DriveMode::PushPull,
         })

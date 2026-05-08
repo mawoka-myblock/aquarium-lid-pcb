@@ -122,6 +122,8 @@ pub static WATER_TEMP_SIGNAL: Watch<CriticalSectionRawMutex, f32, 1> = Watch::ne
 
 pub static FAN_STATE_ON_SIGNAL: Watch<CriticalSectionRawMutex, bool, 1> = Watch::new();
 
+pub static BUZZER_ON_SIGNAL: Watch<CriticalSectionRawMutex, bool, 1> = Watch::new();
+
 pub type NvsMutex = &'static Mutex<CriticalSectionRawMutex, Nvs>;
 
 #[derive(Serialize, Debug)]
