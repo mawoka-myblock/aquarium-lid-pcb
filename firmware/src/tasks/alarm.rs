@@ -1,30 +1,29 @@
 use crate::{AlarmThreshold, BUZZER_ON_SIGNAL, COMMANDS, Command, DATACHANNEL, LedCommand};
-use defmt::unwrap;
+use defmt::{info, unwrap};
 
 use embassy_futures::join::join;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use esp_hal::ledc::{
     LowSpeed,
     channel::{Channel, ChannelIFace},
-    timer::Timer,
 };
 use smart_leds::colors;
 
 #[embassy_executor::task]
-pub async fn fan_task(
-    buzzer: &'static mut Channel<'static, LowSpeed>,
-    _buzzer_timer: &'static mut Timer<'static, LowSpeed>,
-) {
+pub async fn buzzer_task(buzzer: &'static mut Channel<'static, LowSpeed>) {
     let mut sub = COMMANDS.subscriber().unwrap();
     let buzzer_signal_pub = BUZZER_ON_SIGNAL.sender();
     loop {
         let msg = sub.next_message_pure().await;
         match msg {
             Command::BuzzerOn => {
-                unwrap!(buzzer.set_duty(50));
+                info!("Buzzer on");
+                unwrap!(buzzer.set_duty(30));
                 buzzer_signal_pub.send(true);
             }
             Command::BuzzerOff => {
+                info!("Buzzer on");
+
                 unwrap!(buzzer.set_duty(0));
                 buzzer_signal_pub.send(false);
             }
@@ -32,11 +31,10 @@ pub async fn fan_task(
         }
     }
 }
-
 static FAN_THRESHOLD_SIGNAL: Signal<CriticalSectionRawMutex, AlarmThreshold> = Signal::new();
 
 #[embassy_executor::task]
-pub async fn control_fan(cfg: &'static crate::Config) {
+pub async fn control_alarm(cfg: &'static crate::Config) {
     let data_loop = async {
         let mut sub_data = DATACHANNEL.subscriber().unwrap();
         let cmd_pub = COMMANDS.publisher().unwrap();
@@ -51,7 +49,17 @@ pub async fn control_fan(cfg: &'static crate::Config) {
                 crate::DataMessage::WaterTemperature(d) => d,
                 _ => continue,
             };
-            let current_on = temp > thresholds.alarm_above || temp < thresholds.alarm_below;
+            let current_on = if prev_on {
+                // Currently ON:
+                // stay ON until we're comfortably back inside the safe range
+                temp >= (thresholds.max_safe_temp - thresholds.alarm_hysteresis)
+                    || temp <= (thresholds.min_safe_temp + thresholds.alarm_hysteresis)
+            } else {
+                // Currently OFF:
+                // only turn ON when clearly outside the safe range
+                temp >= (thresholds.max_safe_temp + thresholds.alarm_hysteresis)
+                    || temp <= (thresholds.min_safe_temp - thresholds.alarm_hysteresis)
+            };
 
             if current_on != prev_on {
                 if current_on {
@@ -85,10 +93,11 @@ pub async fn control_fan(cfg: &'static crate::Config) {
 }
 
 impl AlarmThreshold {
-    fn from_cfg(cfg: &crate::Config) -> Self {
-        Self {
-            alarm_above: cfg.alarm_above,
-            alarm_below: cfg.alarm_below,
+    fn from_cfg(config: &crate::Config) -> Self {
+        AlarmThreshold {
+            max_safe_temp: config.max_safe_temp,
+            min_safe_temp: config.min_safe_temp,
+            alarm_hysteresis: config.alarm_hysteresis,
         }
     }
 }

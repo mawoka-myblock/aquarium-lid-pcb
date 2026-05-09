@@ -8,7 +8,8 @@ use embassy_sync::{
     channel::Channel,
     mutex::Mutex,
 };
-use esp_hal::rng::Rng;
+use embassy_time::Timer;
+use esp_hal::{rng::Rng, rom::software_reset};
 use esp_radio::wifi::{
     AuthenticationMethod, Config, Interfaces, WifiController, scan::ScanConfig, sta::StationConfig,
 };
@@ -113,6 +114,8 @@ pub async fn handler(
                                 };
                                 RESULT_SIGNAL.signal(0x00);
                                 s.improv_state = crate::bt::ImprovState::Provisioned;
+                                Timer::after_secs(1).await;
+                                software_reset()
                             }
                             Err(_) => {
                                 s.error_state = crate::bt::ErrorState::UnableToConnect;

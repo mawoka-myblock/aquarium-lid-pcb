@@ -67,7 +67,7 @@ pub async fn control_fan(cfg: &'static crate::Config) {
                 if current_on {
                     cmd_pub.publish(Command::FanOn).await;
                     cmd_pub
-                        .publish(Command::SetLeds(LedCommand::AllColor(colors::RED)))
+                        .publish(Command::SetLeds(LedCommand::AllColor(colors::ORANGE)))
                         .await;
                 } else {
                     cmd_pub.publish(Command::FanOff).await;

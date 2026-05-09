@@ -1,11 +1,14 @@
 #![no_std]
 #![feature(impl_trait_in_assoc_type)]
-#![feature(addr_parse_ascii)]
-use embassy_net::{dns::DnsSocket, tcp::client::TcpClient};
+use embassy_net::tcp::client::TcpConnection;
 use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex, pubsub::PubSubChannel, watch::Watch,
 };
-use embedded_mqttc::{client::MqttClient, state::State};
+use heapless::String;
+use rust_mqtt::{
+    buffer::BumpBuffer,
+    client::{Client, options::PublicationOptions},
+};
 use serde::{Deserialize, Serialize};
 use smart_leds::RGB8;
 use static_cell::StaticCell;
@@ -35,8 +38,9 @@ pub const NVS_SIZE: usize = 0x6000;
 pub struct Config {
     fan_on_threshold: f32,
     fan_off_threshold: f32,
-    alarm_above: f32,
-    alarm_below: f32,
+    max_safe_temp: f32,
+    min_safe_temp: f32,
+    alarm_hysteresis: f32,
     led_brightness: u8,
 }
 
@@ -73,8 +77,9 @@ pub struct FanThreshold {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AlarmThreshold {
-    pub alarm_above: f32,
-    pub alarm_below: f32,
+    pub min_safe_temp: f32,
+    pub max_safe_temp: f32,
+    pub alarm_hysteresis: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -83,34 +88,27 @@ pub enum DataMessage {
     AirData(Option<AirData>),
 }
 
-pub type CommandChannel = PubSubChannel<CriticalSectionRawMutex, Command, 4, 6, 6>;
+pub type CommandChannel = PubSubChannel<CriticalSectionRawMutex, Command, 4, 8, 6>;
 
 pub static COMMANDS: CommandChannel = CommandChannel::new();
 
 pub type DataChannel = PubSubChannel<CriticalSectionRawMutex, DataMessage, 4, 4, 4>;
 
-pub type StaticMqttState = State<
-    'static,
-    'static,
+pub static MQTT_RECV_CHANNEL: PubSubChannel<
     CriticalSectionRawMutex,
-    TcpClient<'static, 1, 1024, 1024>,
-    DnsSocket<'static>,
-    1024,
-    128,
-    8,
->;
+    (String<64>, heapless::Vec<u8, 512>),
+    3,
+    1,
+    1,
+> = PubSubChannel::new();
 
-pub type StaticMqttClient = MqttClient<
-    'static,
-    'static,
-    'static,
+pub static MQTT_SEND_CHANNEL: PubSubChannel<
     CriticalSectionRawMutex,
-    TcpClient<'static, 1, 1024, 1024>,
-    DnsSocket<'static>,
-    1024,
-    128,
-    8,
->;
+    (PublicationOptions, heapless::Vec<u8, 512>),
+    3,
+    1,
+    2,
+> = PubSubChannel::new();
 
 pub static DATACHANNEL: DataChannel = DataChannel::new();
 
@@ -130,3 +128,13 @@ pub type NvsMutex = &'static Mutex<CriticalSectionRawMutex, Nvs>;
 pub struct WaterTemperatureResponse {
     pub temp: Option<f32>,
 }
+
+pub type MqttClientType = Client<
+    'static,
+    &'static mut TcpConnection<'static, 1, 1024, 1024>,
+    BumpBuffer<'static>,
+    1,
+    1,
+    1,
+    16,
+>;

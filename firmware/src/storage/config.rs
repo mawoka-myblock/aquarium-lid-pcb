@@ -1,10 +1,18 @@
-use core::net::IpAddr;
+use core::{
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    num::NonZero,
+    str::FromStr,
+};
 
 use crc::{CRC_32_ISCSI, Crc};
 use defmt::{Format, unwrap};
-use embedded_mqttc::{ClientConfig, ClientCredentials, Host};
+use embassy_net::dns::DnsSocket;
 use heapless::{String, Vec};
 use postcard::{from_bytes_crc32, to_slice_crc32};
+use rust_mqtt::{
+    client::options::ConnectOptions,
+    types::{MqttBinary, MqttString},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{CONFIG_SIGNAL, Config, NvsMutex};
@@ -50,8 +58,9 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            alarm_above: 26.0,
-            alarm_below: 23.0,
+            max_safe_temp: 26.0,
+            min_safe_temp: 23.0,
+            alarm_hysteresis: 0.3,
             fan_on_threshold: 25.3,
             fan_off_threshold: 25.0,
             led_brightness: 255,
@@ -107,21 +116,15 @@ pub struct MqttData {
 }
 
 impl MqttData {
-    pub fn to_mqtt_client_config(&self) -> ClientConfig<'_> {
-        let host = match IpAddr::parse_ascii(self.host.as_bytes()) {
-            Ok(d) => Host::Ip(d),
-            Err(_) => Host::Hostname(&self.host),
-        };
-        ClientConfig {
-            host,
-            port: self.port,
-            client_id: &self.client_id,
-            credentials: Some(ClientCredentials {
-                password: &self.password,
-                username: &self.username,
-            }),
-            auto_subscribes: serde_json_core::heapless::Vec::new(),
-        }
+    pub fn to_mqtt_client_config(&self) -> ConnectOptions<'_> {
+        ConnectOptions::new()
+            .clean_start()
+            .session_expiry_interval(rust_mqtt::config::SessionExpiryInterval::EndOnDisconnect)
+            .keep_alive(rust_mqtt::config::KeepAlive::Seconds(
+                NonZero::new(10).unwrap(),
+            ))
+            .user_name(MqttString::from_str(self.username.as_str()).unwrap())
+            .password(MqttBinary::from_slice(self.password.as_bytes()).unwrap())
     }
 
     pub async fn from_nvs(nvs_mutex: NvsMutex) -> Option<Self> {
@@ -142,6 +145,50 @@ impl MqttData {
         } else {
             None
         }
+    }
+
+    pub async fn get_socket_addr(&self, dns: DnsSocket<'_>) -> Option<SocketAddr> {
+        if let Ok(ipv4) = Ipv4Addr::from_str(self.host.as_str()) {
+            return Some(SocketAddr::V4(SocketAddrV4::new(
+                ipv4,
+                self.port.unwrap_or(1883),
+            )));
+        }
+        if let Ok(ipv6) = Ipv6Addr::from_str(self.host.as_str()) {
+            return Some(SocketAddr::V6(SocketAddrV6::new(
+                ipv6,
+                self.port.unwrap_or(1883),
+                0,
+                0,
+            )));
+        }
+        let dns_res = dns
+            .query(&self.host, smoltcp::wire::DnsQueryType::A)
+            .await
+            .ok()?;
+        if let Some(first_ip) = dns_res.first()
+            && let embassy_net::IpAddress::Ipv4(ad) = first_ip
+        {
+            return Some(SocketAddr::V4(SocketAddrV4::new(
+                *ad,
+                self.port.unwrap_or(1883),
+            )));
+        }
+        let dns_res = dns
+            .query(&self.host, smoltcp::wire::DnsQueryType::Aaaa)
+            .await
+            .ok()?;
+        if let Some(first_ip) = dns_res.first()
+            && let embassy_net::IpAddress::Ipv6(ad) = first_ip
+        {
+            return Some(SocketAddr::V6(SocketAddrV6::new(
+                *ad,
+                self.port.unwrap_or(1883),
+                0,
+                0,
+            )));
+        }
+        None
     }
 
     pub async fn to_nvs(&self, nvs_mutex: NvsMutex) {

@@ -1,6 +1,10 @@
-use embedded_mqttc::QoS;
+use heapless::Vec;
+use rust_mqtt::{
+    client::options::{PublicationOptions, TopicReference},
+    types::{MqttString, QoS, TopicName},
+};
 
-use crate::StaticMqttClient;
+use crate::MQTT_SEND_CHANNEL;
 
 const WATER_TEMP_CFG: &str = r#"
 {
@@ -25,7 +29,7 @@ const AIR_TEMP_CFG: &str = r#"
 }
 "#;
 
-const AIR_HUM_CFF: &str = r#"
+const AIR_HUM_CFG: &str = r#"
 {
 "name":"Air Humidity",
 "stat_t":"aquarium/sensor/air/state",
@@ -102,78 +106,164 @@ const LED_BRIGHTNESS: &str = r#"
 }
 "#;
 
-pub async fn publish_discovery(client: StaticMqttClient) {
-    client
-        .publish(
-            "homeassistant/sensor/aquarium_water/config",
-            WATER_TEMP_CFG.as_bytes(),
-            QoS::AtLeastOnce,
-            true,
-        )
-        .await
-        .unwrap();
-    client
-        .publish(
-            "homeassistant/sensor/aquarium_air_temp/config",
-            AIR_TEMP_CFG.as_bytes(),
-            QoS::AtLeastOnce,
-            true,
-        )
-        .await
-        .unwrap();
-    client
-        .publish(
-            "homeassistant/sensor/aquarium_air_hum/config",
-            AIR_HUM_CFF.as_bytes(),
-            QoS::AtLeastOnce,
-            true,
-        )
-        .await
-        .unwrap();
-    client
-        .publish(
-            "homeassistant/switch/aquarium_fan/config",
-            FAN_SWITCH.as_bytes(),
-            QoS::AtLeastOnce,
-            true,
-        )
-        .await
-        .unwrap();
-    client
-        .publish(
-            "homeassistant/switch/aquarium_buzzer/config",
-            BUZZER_SWITCH.as_bytes(),
-            QoS::AtLeastOnce,
-            true,
-        )
-        .await
-        .unwrap();
+const MAX_SAFE_TEMP: &str = r#"
+{
+"name":"Alarm on above",
+"stat_t":"aquarium/sensor/config/state",
+"cmd_t":"aquarium/control/config/max_safe_temp/set",
+"val_tpl": "{{value_json.max_safe_temp}}",
+"uniq_id":"aq_max_safe_temp",
+"unit_of_meas":"°C",
+"mode":"box",
+"step":0.1,
+"dev":{"ids":"aq", "name":"Aquarium Fan"}
+}
+"#;
 
+const MIN_SAFE_TEMP: &str = r#"
+{
+"name":"Alarm off below",
+"stat_t":"aquarium/sensor/config/state",
+"cmd_t":"aquarium/control/config/min_safe_temp/set",
+"val_tpl": "{{value_json.min_safe_temp}}",
+"uniq_id":"aq_min_safe_temp",
+"unit_of_meas":"°C",
+"mode":"box",
+"step":0.1,
+"dev":{"ids":"aq", "name":"Aquarium Fan"}
+}
+"#;
+
+pub async fn publish_discovery() {
+    let client = MQTT_SEND_CHANNEL.publisher().unwrap();
     client
-        .publish(
-            "homeassistant/number/aquarium_fan_on_thres/config",
-            FAN_ON_ABOVE.as_bytes(),
-            QoS::AtLeastOnce,
-            true,
-        )
-        .await
-        .unwrap();
+        .publish((
+            PublicationOptions::new(TopicReference::Name(
+                TopicName::new(MqttString::from_str_unchecked(
+                    "homeassistant/sensor/aquarium_water/config",
+                ))
+                .unwrap(),
+            ))
+            .qos(QoS::AtMostOnce)
+            .retain(),
+            Vec::from_slice(WATER_TEMP_CFG.as_bytes()).unwrap(),
+        ))
+        .await;
     client
-        .publish(
-            "homeassistant/number/aquarium_fan_off_thres/config",
-            FAN_OFF_BELOW.as_bytes(),
-            QoS::AtLeastOnce,
-            true,
-        )
-        .await
-        .unwrap();
+        .publish((
+            PublicationOptions::new(TopicReference::Name(
+                TopicName::new(MqttString::from_str_unchecked(
+                    "homeassistant/sensor/aquarium_air_temp/config",
+                ))
+                .unwrap(),
+            ))
+            .qos(QoS::AtMostOnce)
+            .retain(),
+            Vec::from_slice(AIR_TEMP_CFG.as_bytes()).unwrap(),
+        ))
+        .await;
     client
-        .publish(
-            "homeassistant/number/aquarium_led_brightness/config",
-            LED_BRIGHTNESS.as_bytes(),
-            QoS::AtLeastOnce,
-            true,
-        )
-        .await
-        .unwrap();
+        .publish((
+            PublicationOptions::new(TopicReference::Name(
+                TopicName::new(MqttString::from_str_unchecked(
+                    "homeassistant/sensor/aquarium_air_hum/config",
+                ))
+                .unwrap(),
+            ))
+            .qos(QoS::AtMostOnce)
+            .retain(),
+            Vec::from_slice(AIR_HUM_CFG.as_bytes()).unwrap(),
+        ))
+        .await;
+    client
+        .publish((
+            PublicationOptions::new(TopicReference::Name(
+                TopicName::new(MqttString::from_str_unchecked(
+                    "homeassistant/switch/aquarium_fan/config",
+                ))
+                .unwrap(),
+            ))
+            .qos(QoS::AtMostOnce)
+            .retain(),
+            Vec::from_slice(FAN_SWITCH.as_bytes()).unwrap(),
+        ))
+        .await;
+    client
+        .publish((
+            PublicationOptions::new(TopicReference::Name(
+                TopicName::new(MqttString::from_str_unchecked(
+                    "homeassistant/switch/aquarium_buzzer/config",
+                ))
+                .unwrap(),
+            ))
+            .qos(QoS::AtMostOnce)
+            .retain(),
+            Vec::from_slice(BUZZER_SWITCH.as_bytes()).unwrap(),
+        ))
+        .await;
+    client
+        .publish((
+            PublicationOptions::new(TopicReference::Name(
+                TopicName::new(MqttString::from_str_unchecked(
+                    "homeassistant/number/aquarium_fan_on_thres/config",
+                ))
+                .unwrap(),
+            ))
+            .qos(QoS::AtMostOnce)
+            .retain(),
+            Vec::from_slice(FAN_ON_ABOVE.as_bytes()).unwrap(),
+        ))
+        .await;
+    client
+        .publish((
+            PublicationOptions::new(TopicReference::Name(
+                TopicName::new(MqttString::from_str_unchecked(
+                    "homeassistant/number/aquarium_fan_off_thres/config",
+                ))
+                .unwrap(),
+            ))
+            .qos(QoS::AtMostOnce)
+            .retain(),
+            Vec::from_slice(FAN_OFF_BELOW.as_bytes()).unwrap(),
+        ))
+        .await;
+    client
+        .publish((
+            PublicationOptions::new(TopicReference::Name(
+                TopicName::new(MqttString::from_str_unchecked(
+                    "homeassistant/number/aquarium_led_brightness/config",
+                ))
+                .unwrap(),
+            ))
+            .qos(QoS::AtMostOnce)
+            .retain(),
+            Vec::from_slice(LED_BRIGHTNESS.as_bytes()).unwrap(),
+        ))
+        .await;
+    client
+        .publish((
+            PublicationOptions::new(TopicReference::Name(
+                TopicName::new(MqttString::from_str_unchecked(
+                    "homeassistant/number/aquarium_max_safe_temp/config",
+                ))
+                .unwrap(),
+            ))
+            .qos(QoS::AtMostOnce)
+            .retain(),
+            Vec::from_slice(MAX_SAFE_TEMP.as_bytes()).unwrap(),
+        ))
+        .await;
+    client
+        .publish((
+            PublicationOptions::new(TopicReference::Name(
+                TopicName::new(MqttString::from_str_unchecked(
+                    "homeassistant/number/aquarium_min_safe_temp/config",
+                ))
+                .unwrap(),
+            ))
+            .qos(QoS::AtMostOnce)
+            .retain(),
+            Vec::from_slice(MIN_SAFE_TEMP.as_bytes()).unwrap(),
+        ))
+        .await;
 }

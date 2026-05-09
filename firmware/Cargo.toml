@@ -30,7 +30,8 @@ embassy-net = { version = "0.9.1", features = [
   "tcp",
   "udp",
   "dns",
-  "proto-ipv4"
+  "proto-ipv4",
+  "proto-ipv6",
 ] }
 embedded-io = { version = "0.7.1", features = ["defmt"] }
 embedded-io-async = { version = "0.7.0", features = ["defmt"] }
@@ -66,6 +67,7 @@ smoltcp = { version = "0.13", default-features = false, features = [
   "socket-raw",
   "socket-tcp",
   "socket-udp",
+  "proto-ipv6",
 ] }
 # trouble-host = { version = "0.6", features = ["gatt", "derive", "defmt"] }
 trouble-host = { git = "https://github.com/embassy-rs/trouble.git", rev = "4bf65472d2606d3af43f9c4e18bc7ef9a46c5b14", features = ["gatt", "derive", "defmt"] }
@@ -97,8 +99,8 @@ itoa = { version = "1" }
 picoserve = { version = "0.18", features = ["embassy", "defmt", "json"] }
 postcard = { version = "1", features = ["use-crc"] }
 crc = { version = "*" }
-embedded-mqttc = { git = "https://github.com/mawoka-myblock/embedded-mqttc.git", branch = "update-embassy", default-features = false, features = ["embassy", "ipv4", "defmt"] }
-# embedded-mqttc = { path = "../../embedded-mqttc", default-features = false, features = ["embassy", "ipv4", "defmt"] }
+rust-mqtt = { version = "0.5.1", default-features = false, features = ["defmt", "bump", "v5"]}
+embedded-nal-async = {version = "0.9"}
 
 [profile.dev]
 # Rust debug is too slow.

@@ -7,20 +7,14 @@
 )]
 #![deny(clippy::large_stack_frames)]
 
-// --- move tasks to separate modules ---
-
-// Unified Pub/Sub channel for inter-task communication
-
 // use aht20::AHT20;
 use bt_hci::controller::ExternalController;
-use defmt::{info, unwrap};
+use defmt::{expect, info, unwrap};
 use embassy_executor::Spawner;
-use embassy_net::{
-    dns::DnsSocket,
-    tcp::client::{TcpClient, TcpClientState},
-};
+use embassy_net::tcp::client::{TcpClient, TcpClientState, TcpConnection};
 use embassy_sync::mutex::Mutex;
 use embassy_time::Timer;
+use embedded_nal_async::TcpConnect;
 use esp_ds18b20::Ds18b20;
 use esp_hal::gpio::AnyPin;
 use esp_hal::i2c::master::{self as I2C};
@@ -40,8 +34,6 @@ use esp_hal_smartled::{Ws2812SmartLeds, buffer_size};
 use esp_onewire::OneWireBus;
 use esp_radio::ble::controller::BleConnector;
 use esp_radio::wifi::sta::StationConfig;
-use firmware::storage::config::{MqttData, WifiCreds};
-use firmware::storage::nvs::Nvs;
 use firmware::tasks::config;
 use firmware::tasks::fan::{control_fan, fan_task};
 use firmware::tasks::http::AppProps;
@@ -49,8 +41,14 @@ use firmware::tasks::led::led_task;
 use firmware::tasks::measure::water_temp_task;
 use firmware::tasks::network::net_task;
 use firmware::{COMMANDS, NvsMutex, mk_static};
+use firmware::{MqttClientType, storage::nvs::Nvs};
 use firmware::{bt::improv_ble, tasks::mqtt};
+use firmware::{
+    storage::config::{MqttData, WifiCreds},
+    tasks::alarm,
+};
 use picoserve::AppBuilder;
+use rust_mqtt::buffer::BumpBuffer;
 use static_cell::StaticCell;
 
 use picoserve::AppRouter;
@@ -85,20 +83,12 @@ async fn main(spawner: Spawner) -> ! {
 
     info!("Embassy initialized!");
 
-    // let radio_init: &'static Controller<'_> = &*firmware::mk_static!(
-    //     Controller,
-    //     esp_radio::init().expect("Failed to initialize Wi-Fi/BLE controller")
-    // );
     let (wifi_controller, interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())
         .expect("Failed to initialize Wi-Fi controller");
     let wifi_controller: &'static mut esp_radio::wifi::WifiController =
         firmware::mk_static!(esp_radio::wifi::WifiController, wifi_controller);
-    // find more examples https://github.com/embassy-rs/trouble/tree/main/examples/esp32
     let transport = BleConnector::new(peripherals.BT, Default::default()).unwrap();
     let ble_controller = ExternalController::<_, 20>::new(transport);
-
-    // Set up Pub/Sub channel and spawn tasks
-    // Fan task listens on pubsub
 
     let nvs: NvsMutex = firmware::mk_static!(Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Nvs>, Mutex::new(Nvs::new(firmware::NVS_OFFSET, firmware::NVS_SIZE, peripherals.FLASH).unwrap()));
 
@@ -164,12 +154,6 @@ async fn main(spawner: Spawner) -> ! {
             drive_mode: esp_hal::gpio::DriveMode::PushPull,
         })
         .unwrap();
-    info!("Playing");
-    // let _buzzer = Output::new(
-    //     peripherals.GPIO7,
-    //     esp_hal::gpio::Level::Low,
-    //     OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::PushPull),
-    // );
 
     // i2c init
     let _i2c: &'static mut I2C::I2c<'static, Async> = firmware::mk_static!(
@@ -212,8 +196,10 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(led_task(led, cfg).unwrap());
     spawner.spawn(config::config_task(cfg, nvs).unwrap());
     spawner.spawn(config::config_mqtt_task(nvs).unwrap());
+    spawner.spawn(alarm::buzzer_task(buzzer).unwrap());
+    spawner.spawn(alarm::control_alarm(cfg).unwrap());
     // spawner.spawn(air_data_task(aht)).unwrap();
-    //
+
     Timer::after_millis(1000).await;
     COMMANDS
         .publisher()
@@ -271,25 +257,40 @@ async fn main(spawner: Spawner) -> ! {
         let mqtt_cfg_optn: &'static Option<MqttData> =
             mk_static!(Option<MqttData>, MqttData::from_nvs(nvs).await);
         if let Some(mqtt_cfg) = mqtt_cfg_optn {
+            let u8_buf = firmware::mk_static!([u8; 1536], [0; 1536]);
+            let buffer = firmware::mk_static!(BumpBuffer<'static>, BumpBuffer::new(u8_buf));
+
             static TCP_CLIENT_STATE: StaticCell<TcpClientState<1, 1024, 1024>> = StaticCell::new();
             let tcp_client_state = TCP_CLIENT_STATE.init(TcpClientState::new());
             static TCP_CLIENT: StaticCell<TcpClient<'static, 1, 1024, 1024>> = StaticCell::new();
             let tcp_client = TCP_CLIENT.init(TcpClient::new(stack, tcp_client_state));
-            let dns_client = DnsSocket::new(stack);
-            static MQTT_STATE: StaticCell<firmware::StaticMqttState> = StaticCell::new();
-            let mqtt_state = MQTT_STATE.init_with(|| {
-                firmware::StaticMqttState::new(
-                    mqtt_cfg.to_mqtt_client_config(),
-                    None,
-                    tcp_client,
-                    dns_client,
-                )
-            });
-            spawner.spawn(mqtt::run_mqtt_loop(mqtt_state).unwrap());
-            spawner.spawn(mqtt::listen_commandchannel(mqtt_state.new_client()).unwrap());
-            spawner.spawn(mqtt::listen_datachannel(mqtt_state.new_client()).unwrap());
-            spawner.spawn(mqtt::listen_mqtt(mqtt_state.new_client()).unwrap());
-            mqtt::publish_discovery(mqtt_state.new_client()).await;
+
+            let dns_client = embassy_net::dns::DnsSocket::new(stack);
+
+            let conn = firmware::mk_static!(
+                TcpConnection<'static, 1, 1024, 1024>,
+                tcp_client
+                    .connect(expect!(
+                        mqtt_cfg.get_socket_addr(dns_client).await,
+                        "Couldn't get IP. Either DNS failed or IP is invalid for MQTT!"
+                    ))
+                    .await
+                    .unwrap()
+            );
+
+            let client = firmware::mk_static!(MqttClientType, MqttClientType::new(buffer));
+            unwrap!(
+                client
+                    .connect(conn, &mqtt_cfg.to_mqtt_client_config(), None)
+                    .await
+            );
+
+            spawner.spawn(mqtt::handle_mqtt(client).unwrap());
+            Timer::after_millis(300).await;
+            mqtt::publish_discovery().await;
+            spawner.spawn(mqtt::listen_commandchannel().unwrap());
+            spawner.spawn(mqtt::listen_datachannel().unwrap());
+            spawner.spawn(mqtt::listen_mqtt().unwrap());
         }
     } else {
         spawner.spawn(improv_ble(ble_controller, wifi_controller, interfaces, nvs).unwrap());
