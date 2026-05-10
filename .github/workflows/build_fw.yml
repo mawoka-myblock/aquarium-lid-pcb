@@ -2,10 +2,8 @@ name: Build firmware
 
 on:
   push:
-    branches:
-      - main
     paths:
-      - frontend/**
+      - firmware/**
   workflow_dispatch:
 
 env:
