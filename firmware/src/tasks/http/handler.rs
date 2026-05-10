@@ -1,9 +1,6 @@
-use picoserve::{
-    AppBuilder,
-    routing::{PathRouter, get_service},
-};
+use picoserve::{AppBuilder, routing::PathRouter};
 
-use crate::tasks::http::api;
+use crate::tasks::http::{api, frontend};
 
 impl AppBuilder for super::AppProps {
     type PathRouter = impl PathRouter;
@@ -12,10 +9,7 @@ impl AppBuilder for super::AppProps {
         let Self { state } = self;
 
         picoserve::Router::new()
-            .route(
-                "/",
-                get_service(picoserve::response::File::html("hallo welt")),
-            )
+            .nest("", frontend::frontend_router())
             .nest("/api", api::api_router())
             .with_state(state)
     }

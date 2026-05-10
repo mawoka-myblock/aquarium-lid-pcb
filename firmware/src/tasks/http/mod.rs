@@ -1,4 +1,5 @@
 pub mod api;
+mod frontend;
 mod handler;
 
 use picoserve::AppRouter;
@@ -30,7 +31,7 @@ pub async fn web_task(
     stack: embassy_net::Stack<'static>,
     app: &'static AppRouter<AppProps>,
 ) -> ! {
-    let port = 8080;
+    let port = 80;
     let mut tcp_rx_buffer = [0; 1024];
     let mut tcp_tx_buffer = [0; 1024];
     let mut http_buffer = [0; 2048];

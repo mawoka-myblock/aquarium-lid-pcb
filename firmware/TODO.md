@@ -5,7 +5,7 @@
 
 
 ## Alarm
-- [ ] Add alarm task
+- [x] Add alarm task
 - [ ] Add listener to silence alarm
 - [ ] Expose alarm over MQTT
 
