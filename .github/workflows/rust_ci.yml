@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "**/README.md"
+    paths:
+      - firmware/**
   pull_request:
   workflow_dispatch:
 
@@ -16,6 +16,9 @@ jobs:
   rust-checks:
     name: Rust Checks
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware
     strategy:
       fail-fast: false
       matrix:
