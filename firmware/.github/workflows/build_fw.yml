@@ -1,0 +1,102 @@
+name: Build firmware
+
+on:
+  push:
+    paths:
+      - frontend/**
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      ################
+      # Frontend build
+      ################
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: firmware/src/tasks/http/frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: src/tasks/http/frontend
+        run: pnpm ci
+
+      - name: Build frontend
+        working-directory: src/tasks/http/frontend
+        run: pnpm build
+
+      ################
+      # Rust Setup
+      ################
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: nightly
+          target: riscv32imc-unknown-none-elf
+      - name: Install Cargo-Bininstall
+        uses: cargo-bins/cargo-binstall@main
+      - name: Install ESPflash
+        run: cargo binstall espflash@=4.4.0 --no-confirm --force
+      - name: Enable caching
+        uses: Swatinem/rust-cache@v2
+
+      ################
+      # SETUP RCLONE
+      ################
+      - name: Extract branch and commit
+        run: |
+          echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+          echo "branch=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+      - name: Install Rclone
+        run: curl https://rclone.org/install.sh | sudo bash
+      - name: Configure rclone
+        run: |
+          mkdir -p ~/.config/rclone
+
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [garage]
+          type = s3
+          provider = Other
+          access_key_id = ${{ secrets.S3_ACCESS_KEY }}
+          secret_access_key = ${{ secrets.S3_SECRET_KEY }}
+          endpoint = ${{ secrets.S3_ENDPOINT }}
+          region = garage
+          force_path_style = true
+          EOF
+
+      ################
+      # BUILD FIRMWARE
+      ################
+      - name: Build firmware
+        run: cargo build --release
+      - name: Merge Binary
+        run: espflash save-image --merge --chip esp32c3 target/riscv32imc-unknown-none-elf/release/firmware aquarium.bin
+      ################
+      # UPLOAD ARTIFACT
+      ################
+      - name: Upload file
+        run: |
+          rclone copy aquarium.bin garage:${{ secrets.S3_BUCKET }}/${{ env.branch }}/aquarium_${{ env.sha_short }}.bin
+          rclone copy aquarium.bin garage:${{ secrets.S3_BUCKET }}/${{ env.branch }}/aquarium_latest.bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: firmware/aquarium.bin
