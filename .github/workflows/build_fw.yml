@@ -36,11 +36,11 @@ jobs:
           cache-dependency-path: firmware/src/tasks/http/frontend/pnpm-lock.yaml
 
       - name: Install frontend dependencies
-        working-directory: src/tasks/http/frontend
+        working-directory: firmware/src/tasks/http/frontend
         run: pnpm ci
 
       - name: Build frontend
-        working-directory: src/tasks/http/frontend
+        working-directory: firmware/src/tasks/http/frontend
         run: pnpm build
 
       ################
