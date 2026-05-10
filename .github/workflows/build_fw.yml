@@ -85,7 +85,7 @@ jobs:
       # BUILD FIRMWARE
       ################
       - name: Build firmware
-        run: cargo build -p --release
+        run: cargo build -p firmware --release
       - name: Merge Binary
         run: espflash save-image --merge --chip esp32c3 target/riscv32imc-unknown-none-elf/release/firmware aquarium.bin
       ################
