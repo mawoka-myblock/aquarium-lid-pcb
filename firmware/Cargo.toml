@@ -42,7 +42,6 @@ esp-backtrace = { version = "0.19", features = [
   "panic-handler",
 ] }
 esp-println = { version = "0.17", features = ["defmt-espflash", "esp32c3"] }
-# for more networking protocol support see https://crates.io/crates/edge-net
 bt-hci = "0.8"
 embassy-executor = { version = "0.10", features = ["defmt"] }
 embassy-time = { version = "0.5", features = ["defmt"] }
@@ -76,12 +75,7 @@ critical-section = "1.2.0"
 static_cell      = "2.1"
 aht20 = { git = "https://github.com/mawoka-myblock/ambient-air.git" }
 smart-leds = "0.4"
-# esp-hal-smartled = { version = "0.17", features = ["defmt"] }
 esp-hal-smartled = { git = "https://github.com/mawoka-myblock/esp-hal-smartled.git", branch = "update-esp-hal", features = ["defmt"] }
-# esp-ds18b20 = { git = "https://github.com/mawoka-myblock/esp-ds18b20", branch = "async" }
-# esp-onewire = { git = "https://github.com/mawoka-myblock/esp-onewire", branch = "async" }
-# esp-ds18b20 = { path = "../../esp-ds18b20" }
-# esp-onewire = { path = "../../esp-onewire" }
 esp-ds18b20 = { git = "https://github.com/abreis/esp-ds18b20" }
 esp-onewire = { git = "https://github.com/abreis/esp-onewire", tag = "v1.0.0" }
 embedded-storage = { version = "*" }
@@ -101,14 +95,13 @@ postcard = { version = "1", features = ["use-crc"] }
 crc = { version = "*" }
 rust-mqtt = { version = "0.5.1", default-features = false, features = ["defmt", "bump", "v5"]}
 embedded-nal-async = {version = "0.9"}
+async-button = { version = "0.2", features = ["defmt"] }
 
 [profile.dev]
-# Rust debug is too slow.
-# For debug builds always builds with some optimization
 opt-level = "s"
 
 [profile.release]
-codegen-units    = 1     # LLVM can perform better optimizations using a single thread
+codegen-units    = 1
 debug            = 2
 debug-assertions = false
 incremental      = false

@@ -16,7 +16,7 @@ use embassy_sync::mutex::Mutex;
 use embassy_time::Timer;
 use embedded_nal_async::TcpConnect;
 use esp_ds18b20::Ds18b20;
-use esp_hal::gpio::AnyPin;
+use esp_hal::gpio::{AnyPin, Input, InputConfig};
 use esp_hal::i2c::master::{self as I2C};
 use esp_hal::ledc;
 use esp_hal::ledc::channel::ChannelIFace;
@@ -34,12 +34,12 @@ use esp_hal_smartled::{Ws2812SmartLeds, buffer_size};
 use esp_onewire::OneWireBus;
 use esp_radio::ble::controller::BleConnector;
 use esp_radio::wifi::sta::StationConfig;
-use firmware::tasks::config;
 use firmware::tasks::fan::{control_fan, fan_task};
 use firmware::tasks::http::AppProps;
 use firmware::tasks::led::led_task;
 use firmware::tasks::measure::water_temp_task;
 use firmware::tasks::network::net_task;
+use firmware::tasks::{button, config};
 use firmware::{COMMANDS, NvsMutex, mk_static};
 use firmware::{MqttClientType, storage::nvs::Nvs};
 use firmware::{bt::improv_ble, tasks::mqtt};
@@ -190,6 +190,15 @@ async fn main(spawner: Spawner) -> ! {
     let sen: &'static mut Ds18b20 =
         firmware::mk_static!(Ds18b20, Ds18b20::new(addr, ow_bus).unwrap());
 
+    // Button init
+    let btn: &'static mut Input<'static> = firmware::mk_static!(
+        Input<'static>,
+        Input::new(
+            peripherals.GPIO6,
+            InputConfig::default().with_pull(esp_hal::gpio::Pull::Up),
+        )
+    );
+
     spawner.spawn(fan_task(fan1, fan2).unwrap());
     spawner.spawn(water_temp_task(sen).unwrap());
     spawner.spawn(control_fan(cfg).unwrap());
@@ -198,6 +207,7 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(config::config_mqtt_task(nvs).unwrap());
     spawner.spawn(alarm::buzzer_task(buzzer).unwrap());
     spawner.spawn(alarm::control_alarm(cfg).unwrap());
+    spawner.spawn(button::button_task(btn).unwrap());
     // spawner.spawn(air_data_task(aht)).unwrap();
 
     Timer::after_millis(1000).await;

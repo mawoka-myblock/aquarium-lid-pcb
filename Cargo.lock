@@ -43,6 +43,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "async-button"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6cb2c64198ecf080dccccff92166ee0eb0fc1b22b15546903d59ea31ad76f6d"
+dependencies = [
+ "cfg-if",
+ "defmt 0.3.100",
+ "embassy-time 0.4.0",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+]
+
+[[package]]
 name = "atomic-polyfill"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -559,7 +572,7 @@ dependencies = [
  "document-features",
  "embassy-net-driver",
  "embassy-sync 0.8.0",
- "embassy-time",
+ "embassy-time 0.5.1",
  "embedded-io-async 0.7.0",
  "embedded-nal-async",
  "heapless 0.9.3",
@@ -617,6 +630,23 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "heapless 0.9.3",
+]
+
+[[package]]
+name = "embassy-time"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f820157f198ada183ad62e0a66f554c610cdcd1a9f27d4b316358103ced7a1f8"
+dependencies = [
+ "cfg-if",
+ "critical-section",
+ "defmt 0.3.100",
+ "document-features",
+ "embassy-time-driver",
+ "embedded-hal 0.2.7",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "futures-util",
 ]
 
 [[package]]
@@ -1299,6 +1329,7 @@ version = "0.1.0"
 dependencies = [
  "aht20",
  "anyhow",
+ "async-button",
  "bt-hci",
  "crc",
  "critical-section",
@@ -1307,7 +1338,7 @@ dependencies = [
  "embassy-futures",
  "embassy-net",
  "embassy-sync 0.8.0",
- "embassy-time",
+ "embassy-time 0.5.1",
  "embedded-io 0.7.1",
  "embedded-io-async 0.7.0",
  "embedded-nal-async",
@@ -1777,7 +1808,7 @@ dependencies = [
  "const-sha1",
  "defmt 1.0.1",
  "embassy-net",
- "embassy-time",
+ "embassy-time 0.5.1",
  "embedded-io-async 0.7.0",
  "heapless 0.8.0",
  "picoserve_derive",
@@ -2464,7 +2495,7 @@ dependencies = [
  "defmt 1.0.1",
  "embassy-futures",
  "embassy-sync 0.8.0",
- "embassy-time",
+ "embassy-time 0.5.1",
  "embedded-io 0.7.1",
  "futures",
  "heapless 0.9.3",

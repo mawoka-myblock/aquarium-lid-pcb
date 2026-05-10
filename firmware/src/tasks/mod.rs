@@ -1,4 +1,5 @@
 pub mod alarm;
+pub mod button;
 pub mod config;
 pub mod fan;
 pub mod http;

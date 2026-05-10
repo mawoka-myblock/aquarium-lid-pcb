@@ -88,7 +88,7 @@ pub enum DataMessage {
     AirData(Option<AirData>),
 }
 
-pub type CommandChannel = PubSubChannel<CriticalSectionRawMutex, Command, 4, 8, 6>;
+pub type CommandChannel = PubSubChannel<CriticalSectionRawMutex, Command, 4, 8, 7>;
 
 pub static COMMANDS: CommandChannel = CommandChannel::new();
 
