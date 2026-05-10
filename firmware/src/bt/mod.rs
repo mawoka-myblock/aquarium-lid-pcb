@@ -1,3 +1,4 @@
+#![allow(clippy::needless_borrows_for_generic_args)]
 use defmt::{error, info, warn};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex, signal::Signal};
 use esp_radio::{
