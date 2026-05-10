@@ -57,6 +57,8 @@ jobs:
         run: cargo binstall espflash@=4.4.0 --no-confirm --force
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: firmware
 
       ################
       # SETUP RCLONE

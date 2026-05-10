@@ -64,5 +64,9 @@ jobs:
           components: rust-src, rustfmt, clippy
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
+      - name: Enable caching
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: firmware
       - name: Run command
         run: cargo ${{ matrix.action.command }} ${{ matrix.action.args }}
