@@ -37,7 +37,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: firmware/src/tasks/http/frontend
-        run: pnpm ci --allow-build=esbuild
+        run: pnpm ci --ignore-scripts
 
       - name: Build frontend
         working-directory: firmware/src/tasks/http/frontend

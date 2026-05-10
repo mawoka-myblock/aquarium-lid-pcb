@@ -7,13 +7,13 @@
 		"preview": "vite preview"
 	},
 	"dependencies": {
-		"preact": "^10.26.9"
+		"preact": "^10.29.1"
 	},
 	"devDependencies": {
-		"@preact/preset-vite": "^2.10.2",
+		"@preact/preset-vite": "^2.10.5",
 		"typescript": "^6.0.3",
 		"unocss": "^66.6.8",
-		"vite": "^7.0.4",
+		"vite": "^7.3.3",
 		"vite-plugin-compression2": "^2.5.3"
 	}
 }
