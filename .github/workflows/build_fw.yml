@@ -78,8 +78,9 @@ jobs:
           access_key_id = ${{ secrets.S3_ACCESS_KEY }}
           secret_access_key = ${{ secrets.S3_SECRET_KEY }}
           endpoint = ${{ secrets.S3_ENDPOINT }}
-          region = garage
+          region = us-east-1
           force_path_style = true
+          signature_v2 = True
           EOF
 
       ################

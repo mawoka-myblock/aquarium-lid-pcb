@@ -32,6 +32,30 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+      ################
+      # Frontend build
+      ################
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: firmware/src/tasks/http/frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: firmware/src/tasks/http/frontend
+        run: pnpm ci --ignore-scripts
+
+      - name: Build frontend
+        working-directory: firmware/src/tasks/http/frontend
+        run: pnpm build
+      ################
+      # Rust build
+      ################
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@v1
         with:
