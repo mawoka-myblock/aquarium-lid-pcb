@@ -23,7 +23,7 @@ dependencies = [
 [[package]]
 name = "aht20"
 version = "0.1.0"
-source = "git+ssh://git@github.com/mawoka-myblock/ambient-air.git#8f5fa239b09eec0c5ee170025bf21c8ebaedc81d"
+source = "git+https://github.com/mawoka-myblock/ambient-air.git#8f5fa239b09eec0c5ee170025bf21c8ebaedc81d"
 dependencies = [
  "crc-any",
  "embedded-hal 1.0.0",

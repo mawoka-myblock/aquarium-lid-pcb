@@ -74,7 +74,7 @@ trouble-host = { git = "https://github.com/embassy-rs/trouble.git", rev = "4bf65
 
 critical-section = "1.2.0"
 static_cell      = "2.1"
-aht20 = { git = "ssh://git@github.com/mawoka-myblock/ambient-air.git" }
+aht20 = { git = "https://github.com/mawoka-myblock/ambient-air.git" }
 smart-leds = "0.4"
 # esp-hal-smartled = { version = "0.17", features = ["defmt"] }
 esp-hal-smartled = { git = "https://github.com/mawoka-myblock/esp-hal-smartled.git", branch = "update-esp-hal", features = ["defmt"] }
