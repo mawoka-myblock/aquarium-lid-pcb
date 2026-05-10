@@ -16,19 +16,16 @@ jobs:
   rust-checks:
     name: Rust Checks
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: firmware
     strategy:
       fail-fast: false
       matrix:
         action:
           - command: build
-            args: --release
+            args: -p firmware --release
           - command: fmt
-            args: --all -- --check
+            args: -p firmware --all -- --check
           - command: clippy
-            args: --all-features --workspace -- -D warnings
+            args: -p firmware --all-features --workspace -- -D warnings
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -62,8 +59,6 @@ jobs:
           target: riscv32imc-unknown-none-elf
           toolchain: nightly
           components: rust-src, rustfmt, clippy
-      - name: Enable caching
-        uses: Swatinem/rust-cache@v2
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
         with:

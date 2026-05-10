@@ -13,10 +13,6 @@ jobs:
   compile:
     name: Compile
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: firmware
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -89,7 +85,7 @@ jobs:
       # BUILD FIRMWARE
       ################
       - name: Build firmware
-        run: cargo build --release
+        run: cargo build -p --release
       - name: Merge Binary
         run: espflash save-image --merge --chip esp32c3 target/riscv32imc-unknown-none-elf/release/firmware aquarium.bin
       ################
@@ -97,8 +93,8 @@ jobs:
       ################
       - name: Upload file
         run: |
-          rclone copy aquarium.bin garage:${{ secrets.S3_BUCKET }}/${{ env.branch }}/aquarium_${{ env.sha_short }}.bin
-          rclone copy aquarium.bin garage:${{ secrets.S3_BUCKET }}/${{ env.branch }}/aquarium_latest.bin
+          rclone copyto aquarium.bin garage:${{ secrets.S3_BUCKET }}/${{ env.branch }}/aquarium_${{ env.sha_short }}.bin
+          rclone copyto aquarium.bin garage:${{ secrets.S3_BUCKET }}/${{ env.branch }}/aquarium_latest.bin
       - uses: actions/upload-artifact@v4
         with:
           name: firmware
