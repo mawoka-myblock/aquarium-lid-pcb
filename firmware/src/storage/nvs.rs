@@ -106,6 +106,7 @@ impl Nvs {
     pub async fn invalidate_key(&self, key: &[u8]) -> anyhow::Result<(), ErrorCode> {
         let _drop = self.semaphore.acquire(1).await.unwrap();
         self.tickv.invalidate_key(hash(key))?;
+        self.tickv.garbage_collect()?;
         Ok(())
     }
 
