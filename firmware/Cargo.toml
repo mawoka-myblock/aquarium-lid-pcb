@@ -37,6 +37,7 @@ embedded-io = { version = "0.7.1", features = ["defmt"] }
 embedded-io-async = { version = "0.7.0", features = ["defmt"] }
 esp-alloc = { version = "0.10", features = ["defmt"] }
 esp-backtrace = { version = "0.19", features = [
+  "custom-halt",
   "defmt",
   "esp32c3",
   "panic-handler",

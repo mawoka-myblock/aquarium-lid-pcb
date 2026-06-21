@@ -1,7 +1,5 @@
 use crate::{COMMANDS, Command, DATACHANNEL, FAN_STATE_ON_SIGNAL, FanThreshold, LedCommand};
-use defmt::info;
-
-use defmt::unwrap;
+use defmt::{error, info};
 use embassy_futures::join::join;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use esp_hal::ledc::{
@@ -21,14 +19,22 @@ pub async fn fan_task(
         let msg = sub.next_message_pure().await;
         match msg {
             Command::FanOn => {
-                unwrap!(fan1.set_duty(100));
-                unwrap!(fan2.set_duty(100));
+                if let Err(e) = fan1.set_duty(100) {
+                    error!("fan1.set_duty failed: {:#?}", defmt::Debug2Format(&e));
+                }
+                if let Err(e) = fan2.set_duty(100) {
+                    error!("fan2.set_duty failed: {:#?}", defmt::Debug2Format(&e));
+                }
                 info!("Fan turned on");
                 signal_pub.send(true);
             }
             Command::FanOff => {
-                fan1.set_duty(0).ok();
-                fan2.set_duty(0).ok();
+                if let Err(e) = fan1.set_duty(0) {
+                    error!("fan1.set_duty(0) failed: {:#?}", defmt::Debug2Format(&e));
+                }
+                if let Err(e) = fan2.set_duty(0) {
+                    error!("fan2.set_duty(0) failed: {:#?}", defmt::Debug2Format(&e));
+                }
                 info!("Fan turned off");
                 signal_pub.send(false);
             }

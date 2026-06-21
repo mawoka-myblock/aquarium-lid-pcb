@@ -1,5 +1,5 @@
 use crate::{AlarmThreshold, BUZZER_ON_SIGNAL, COMMANDS, Command, DATACHANNEL, LedCommand};
-use defmt::{info, unwrap};
+use defmt::{error, info};
 
 use embassy_futures::join::join;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
@@ -18,13 +18,16 @@ pub async fn buzzer_task(buzzer: &'static mut Channel<'static, LowSpeed>) {
         match msg {
             Command::BuzzerOn => {
                 info!("Buzzer on");
-                unwrap!(buzzer.set_duty(30));
+                if let Err(e) = buzzer.set_duty(30) {
+                    error!("buzzer.set_duty(30) failed: {:#?}", defmt::Debug2Format(&e));
+                }
                 buzzer_signal_pub.send(true);
             }
             Command::BuzzerOff => {
-                info!("Buzzer on");
-
-                unwrap!(buzzer.set_duty(0));
+                info!("Buzzer off");
+                if let Err(e) = buzzer.set_duty(0) {
+                    error!("buzzer.set_duty(0) failed: {:#?}", defmt::Debug2Format(&e));
+                }
                 buzzer_signal_pub.send(false);
             }
             _ => {}

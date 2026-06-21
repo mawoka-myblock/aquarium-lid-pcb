@@ -7,3 +7,4 @@ pub mod led;
 pub mod measure;
 pub mod mqtt;
 pub mod network;
+pub mod safety;

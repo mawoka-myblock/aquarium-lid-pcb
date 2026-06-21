@@ -63,14 +63,22 @@ impl Nvs {
     }
 
     pub async fn get_key(&self, key: &[u8]) -> anyhow::Result<[u8; 1024], ErrorCode> {
-        let _permit = self.semaphore.acquire(1).await.unwrap();
+        let _permit = self
+            .semaphore
+            .acquire(1)
+            .await
+            .map_err(|_| ErrorCode::ReadFail)?;
         let mut buf = [0u8; 1024];
         self.tickv.get_key(hash(key), &mut buf)?;
         Ok(buf)
     }
 
     pub async fn append_key(&self, key: &[u8], buf: &[u8]) -> Result<(), ErrorCode> {
-        let _drop = self.semaphore.acquire(1).await.unwrap();
+        let _drop = self
+            .semaphore
+            .acquire(1)
+            .await
+            .map_err(|_| ErrorCode::WriteFail)?;
         let res = self.tickv.append_key(hash(key), buf);
         info!("Append done");
         if let Err(e) = res {
@@ -104,7 +112,11 @@ impl Nvs {
     }
 
     pub async fn invalidate_key(&self, key: &[u8]) -> anyhow::Result<(), ErrorCode> {
-        let _drop = self.semaphore.acquire(1).await.unwrap();
+        let _drop = self
+            .semaphore
+            .acquire(1)
+            .await
+            .map_err(|_| ErrorCode::EraseFail)?;
         self.tickv.invalidate_key(hash(key))?;
         self.tickv.garbage_collect()?;
         Ok(())

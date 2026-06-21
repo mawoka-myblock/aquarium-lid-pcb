@@ -39,6 +39,7 @@ use firmware::tasks::http::AppProps;
 use firmware::tasks::led::led_task;
 use firmware::tasks::measure::water_temp_task;
 use firmware::tasks::network::net_task;
+use firmware::tasks::safety::{self, safety_monitor};
 use firmware::tasks::{button, config};
 use firmware::{COMMANDS, NvsMutex, mk_static};
 use firmware::{MqttClientType, storage::nvs::Nvs};
@@ -186,7 +187,15 @@ async fn main(spawner: Spawner) -> ! {
     // DS18B20 Init
     let ow_pin = AnyPin::from(peripherals.GPIO8);
     let mut ow_bus = OneWireBus::new(ow_pin);
-    let addr = ow_bus.find_first_device().unwrap();
+    let addr = loop {
+        match ow_bus.find_first_device() {
+            Ok(a) => break a,
+            Err(e) => {
+                defmt::error!("No DS18B20 found, retrying: {:#?}", defmt::Debug2Format(&e));
+                Timer::after_millis(500).await;
+            }
+        }
+    };
     let sen: &'static mut Ds18b20 =
         firmware::mk_static!(Ds18b20, Ds18b20::new(addr, ow_bus).unwrap());
 
@@ -208,6 +217,7 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(alarm::buzzer_task(buzzer).unwrap());
     spawner.spawn(alarm::control_alarm(cfg).unwrap());
     spawner.spawn(button::button_task(btn).unwrap());
+    spawner.spawn(safety::safety_monitor().unwrap());
     // spawner.spawn(air_data_task(aht)).unwrap();
 
     Timer::after_millis(1000).await;

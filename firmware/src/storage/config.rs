@@ -44,8 +44,18 @@ impl Config {
         let res = to_slice_crc32(self, &mut buf, crc.digest()).unwrap();
         {
             let nvs = nvs_mutex.lock().await;
-            let _ = nvs.invalidate_key(b"CFG").await;
-            nvs.append_key(b"CFG", res).await.unwrap();
+            if let Err(e) = nvs.invalidate_key(b"CFG").await {
+                defmt::error!(
+                    "Failed to invalidate old config key: {:#?}",
+                    defmt::Debug2Format(&e)
+                );
+            }
+            if let Err(e) = nvs.append_key(b"CFG", res).await {
+                defmt::error!(
+                    "Failed to write config to NVS: {:#?}",
+                    defmt::Debug2Format(&e)
+                );
+            }
         }
     }
 
@@ -82,27 +92,34 @@ impl WifiCreds {
             let passwd = nvs.get_key(b"WF_PW").await.ok();
             (ssid, passwd)
         };
-        let ssid_vec: Vec<u8, 32> = Vec::from_slice(&ssid[..32]).unwrap();
+        let ssid_vec: Vec<u8, 32> = Vec::from_slice(&ssid[..32]).ok()?;
         let mut passwd_vec: Vec<u8, 64> = Vec::new();
         if let Some(pw_slice) = passwd {
-            passwd_vec.extend_from_slice(&pw_slice[..64]).unwrap();
+            passwd_vec.extend_from_slice(&pw_slice[..64]).ok()?;
         }
         Some(WifiCreds {
-            password: heapless::String::from_utf8(passwd_vec).unwrap(),
-            ssid: heapless::String::from_utf8(ssid_vec).unwrap(),
+            password: heapless::String::from_utf8(passwd_vec).ok()?,
+            ssid: heapless::String::from_utf8(ssid_vec).ok()?,
         })
     }
     pub async fn save_to_nvs(self, nvs_mutex: NvsMutex) {
         let nvs = nvs_mutex.lock().await;
-        nvs.invalidate_key(b"WF_SSID").await.ok();
-        nvs.invalidate_key(b"WF_PW").await.ok();
+        if let Err(e) = nvs.invalidate_key(b"WF_SSID").await {
+            defmt::error!(
+                "Failed to invalidate WF_SSID: {:#?}",
+                defmt::Debug2Format(&e)
+            );
+        }
+        if let Err(e) = nvs.invalidate_key(b"WF_PW").await {
+            defmt::error!("Failed to invalidate WF_PW: {:#?}", defmt::Debug2Format(&e));
+        }
 
-        nvs.append_key(b"WF_SSID", self.ssid.as_bytes())
-            .await
-            .unwrap();
-        nvs.append_key(b"WF_PW", self.password.as_bytes())
-            .await
-            .unwrap();
+        if let Err(e) = nvs.append_key(b"WF_SSID", self.ssid.as_bytes()).await {
+            defmt::error!("Failed to save SSID: {:#?}", defmt::Debug2Format(&e));
+        }
+        if let Err(e) = nvs.append_key(b"WF_PW", self.password.as_bytes()).await {
+            defmt::error!("Failed to save password: {:#?}", defmt::Debug2Format(&e));
+        }
     }
 }
 

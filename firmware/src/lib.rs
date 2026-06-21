@@ -138,3 +138,14 @@ pub type MqttClientType = Client<
     1,
     16,
 >;
+
+/// Custom panic-halt callback for `esp-backtrace`.
+///
+/// Instead of dead-locking the CPU in an empty loop after a panic, we reboot.
+/// This is a last-resort safety net so the fish never get cooked because the
+/// firmware got stuck.
+#[unsafe(no_mangle)]
+extern "Rust" fn custom_halt() -> ! {
+    defmt::error!("PANIC — rebooting instead of freezing");
+    esp_hal::system::software_reset();
+}

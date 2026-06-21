@@ -12,16 +12,17 @@ pub async fn button_task(phy_btn: &'static mut Input<'static>) {
             ButtonEvent::LongPress => {
                 command_pub.publish(crate::Command::BuzzerOff).await;
             }
-            ButtonEvent::ShortPress { count } => match count {
-                2 => match FAN_STATE_ON_SIGNAL.try_get() {
-                    Some(d) => match d {
-                        true => command_pub.publish(crate::Command::FanOff).await,
-                        false => command_pub.publish(crate::Command::FanOn).await,
-                    },
-                    None => command_pub.publish(crate::Command::FanOn).await,
-                },
-                _ => (),
-            },
+            ButtonEvent::ShortPress { count } => {
+                if count == 2 {
+                    match FAN_STATE_ON_SIGNAL.try_get() {
+                        Some(d) => match d {
+                            true => command_pub.publish(crate::Command::FanOff).await,
+                            false => command_pub.publish(crate::Command::FanOn).await,
+                        },
+                        None => command_pub.publish(crate::Command::FanOn).await,
+                    }
+                }
+            }
         }
     }
 }
