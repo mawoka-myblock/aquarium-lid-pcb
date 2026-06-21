@@ -39,7 +39,7 @@ use firmware::tasks::http::AppProps;
 use firmware::tasks::led::led_task;
 use firmware::tasks::measure::water_temp_task;
 use firmware::tasks::network::net_task;
-use firmware::tasks::safety::{self, safety_monitor};
+use firmware::tasks::safety;
 use firmware::tasks::{button, config};
 use firmware::{COMMANDS, NvsMutex, mk_static};
 use firmware::{MqttClientType, storage::nvs::Nvs};
