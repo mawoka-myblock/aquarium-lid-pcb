@@ -1,5 +1,5 @@
 use defmt::{error, info};
-use embassy_futures::select::{select, Either};
+use embassy_futures::select::{Either, select};
 use embassy_time::Timer;
 use smart_leds::colors;
 

@@ -1,4 +1,4 @@
-use defmt::{error, Debug2Format};
+use defmt::{Debug2Format, error};
 use embassy_time::Timer;
 use esp_hal::Async;
 use esp_hal_smartled::{Ws2812SmartLeds, buffer_size};
@@ -42,7 +42,10 @@ pub async fn led_task(
         // Run effect
         effect.update(&mut frame);
 
-        if let Err(e) = leds.write(brightness(frame.iter().copied(), brightness_val)).await {
+        if let Err(e) = leds
+            .write(brightness(frame.iter().copied(), brightness_val))
+            .await
+        {
             error!("LED write failed: {:#?}", Debug2Format(&e));
         }
 
