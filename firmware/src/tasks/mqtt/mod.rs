@@ -99,8 +99,11 @@ pub async fn listen_datachannel() {
                 }
             }
             crate::DataMessage::WaterTemperature(d) => {
+                use micromath::F32Ext;
                 let d_len = unwrap!(serde_json_core::to_slice::<WaterTemperatureResponse>(
-                    &WaterTemperatureResponse { temp: Some(d) },
+                    &WaterTemperatureResponse {
+                        temp: Some((d * 10.0).round() / 10.0)
+                    },
                     &mut buf
                 ));
                 (WATER_STATE_TOPIC, &buf[..d_len], false)

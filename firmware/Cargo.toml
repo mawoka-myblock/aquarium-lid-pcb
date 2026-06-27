@@ -97,6 +97,7 @@ crc = { version = "*" }
 rust-mqtt = { version = "0.5.1", default-features = false, features = ["defmt", "bump", "v5"]}
 embedded-nal-async = {version = "0.9"}
 async-button = { version = "0.2", features = ["defmt"] }
+micromath = { version = "2" }
 
 [profile.dev]
 opt-level = "s"
