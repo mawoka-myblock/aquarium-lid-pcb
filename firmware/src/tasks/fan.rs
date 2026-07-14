@@ -51,7 +51,6 @@ pub async fn control_fan(cfg: &'static crate::Config) {
         let mut sub_data = DATACHANNEL.subscriber().unwrap();
         let cmd_pub = COMMANDS.publisher().unwrap();
         let mut thresholds = FanThreshold::from_cfg(cfg);
-        let mut prev_on = false;
         loop {
             if let Some(new_thr) = FAN_THRESHOLD_SIGNAL.try_take() {
                 thresholds = new_thr;
@@ -61,6 +60,12 @@ pub async fn control_fan(cfg: &'static crate::Config) {
                 crate::DataMessage::WaterTemperature(d) => d,
                 _ => continue,
             };
+
+            let prev_on = FAN_STATE_ON_SIGNAL
+                .anon_receiver()
+                .try_get()
+                .unwrap_or(false);
+
             let current_on = if temp >= thresholds.fan_on {
                 true
             } else if temp <= thresholds.fan_off {
@@ -81,7 +86,6 @@ pub async fn control_fan(cfg: &'static crate::Config) {
                         .publish(Command::SetLeds(LedCommand::AllColor(colors::GREEN)))
                         .await;
                 }
-                prev_on = current_on;
             }
         }
     };
